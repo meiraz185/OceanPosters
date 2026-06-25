@@ -216,7 +216,7 @@ function setup() {
   let c = createCanvas(windowWidth, windowHeight);
   c.elt.style.touchAction = 'none';
   pixelDensity(min(2, window.devicePixelRatio || 1));
-  frameRate(60);
+  frameRate(30);
 
   computeActiveTransform();
 
