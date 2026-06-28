@@ -2,1525 +2,1578 @@
    OCEAN PLASTIC POSTERS — Mobile Interactive Experience
    ========================================================= */
 
-let fontRegular;
-let fontBold;
-
-let posters = [];
-let activePoster = -1; // -1 = home screen
-
-let posterW = 650;
-let posterH = 975;
-
-let activeScale = 1;
-let activeX;
-let activeY;
-
-let galleryCards = [];
-
-// "Learn more" chip button geometry (inside poster space)
-let btnX = 30;
-let btnY = 895;
-let btnW = 150;
-let btnH = 42;
-
-// App state: 'home' | 'poster'
-let appState = 'home';
-
-// swipe / slide transition between posters
-let slideOffset = 0;       // current horizontal slide offset (px, in poster space)
-let slideTarget = 0;
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartOffset = 0;
-let dragDeltaForTap = 0;
-let swipeLocked = false;
-
-// presentation / mockup mode
-let presentationMode = false;
-let fakeFingerT = 0;
-
-// particles + confetti
-let particles = [];
-let confetti = [];
-
-// share feedback
-let shareMsg = '';
-let shareMsgTimer = 0;
-
-// performance caches
-let homeGradientCache = null;
-let deckCache = null;
-let visualCachesReady = false;
-let touchMoveHandledThisFrame = false;
-
-function preload() {
-  fontRegular = loadFont("ArchivoBlack-Regular.ttf");
-  fontBold = loadFont("Bungee-Regular.ttf");
-
-  posters = [
-    {
-      name: "Seal",
-      bg: loadImage("seal.png"),
-      plastic: loadImage("Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png"),
-      bgX: -100,
-      bgY: -300,
-      dark: 70,
-      title1: "PLASTIC ",
-      title2: "SUFFOCATES",
-      title1Size: 135,
-      title2Size: 94,
-      title1Y: 865,
-      title2Y: 960,
-      title1Offset: -99,
-      title2Offset: -105,
-      sideText: [
-        "Every piece ",
-        "Of plastic ",
-        "You discard",
-        "Stays forever.",
-        "It tightens.",
-        "It strangles.",
-      ],
-      thinkY: 655,
-      popupText:
-        "Seals, sea lions and other animals can't tell plastic from jellyfish.\nThey swallow it. They choke on it. They die from it.\n\n" +
-        "They struggle for hours. For days.\nUntil they can't anymore.\n\n" +
-        "Your trash. Their extinction.",
-      itemType: "plastic",
-    },
-
-    {
-      name: "Whale",
-      bg: loadImage("whale.png"),
-      plastic: loadImage("Gemini_Generated_Image_2rijc92rijc92rij.png"),
-      bgX: -330,
-      bgY: -90,
-      dark: 70,
-      title1: "PLASTIC ",
-      title2: "STARVES",
-      title1Size: 135,
-      title2Size: 131,
-      title1Y: 841,
-      title2Y: 960,
-      title1Offset: -99,
-      title2Offset: -105,
-      sideText: [
-        "Every piece ",
-        "Of plastic ",
-        "You discard",
-        "Stays forever.",
-        "It is swallowed.",
-        "It starves.",
-      ],
-      thinkY: 631,
-      popupText:
-        "Whales swallow hundreds of plastic pieces a day.\nTheir stomachs fill up but they get no nutrition.\nThey feel full. They stop eating. They starve.\n\n" +
-        "Seabirds feed plastic to their chicks.\nSea turtles, fish, whales, all dying hungry.\nWith stomachs full of your trash.\n\n" +
-        "Your trash. Their extinction.",
-      itemType: "plastic",
-    },
-
-    {
-      name: "Sea Turtle",
-      bg: loadImage("9B31B070-C374-4143-858F-F08E009188A7 (1).PNG"),
-      plastic: loadImage("bag.png"),
-      bgX: -100,
-      bgY: -300,
-      dark: 70,
-      title1: "PLASTIC ",
-      title2: "ENTANGLES",
-      title1Size: 135,
-      title2Size: 101,
-      title1Y: 860,
-      title2Y: 960,
-      title1Offset: -99,
-      title2Offset: -105,
-      sideText: [
-        "Every piece ",
-        "Of plastic ",
-        "You discard",
-        "Stays forever.",
-        "It traps.",
-        "It hurts.",
-      ],
-      thinkY: 649,
-      popupText:
-        "Sea turtles and other marine animals are injured by plastic every day.\n\n" +
-        "Nets, rings and other sharp objects trap and kill them.\nSlowly. Tightly. Without mercy.\n\n" +
-        "Your trash. Their extinction.",
-      itemType: "bag",
-    },
-
-    {
-      name: "Fish",
-      bg: loadImage("nemo.png"),
-      plastic: loadImage("plate1.png"),
-      bgX: -140,
-      bgY: -370,
-      dark: 45,
-      title1: "PLASTIC ",
-      title2: "DESTROYS",
-      title1Size: 135,
-      title2Size: 113,
-      title1Y: 841,
-      title2Y: 960,
-      title1Offset: -92,
-      title2Offset: -105,
-      sideText: [
-        "Every piece ",
-        "Of plastic ",
-        "You discard",
-        "Stays forever.",
-        "It invades.",
-        "It buries.",
-      ],
-      thinkY: 639,
-      popupText:
-        "Plastic smothers coral reefs.\nIt blocks sunlight. It kills algae.\nWithout algae there is no reef. Without reef there are no fish.\n\n" +
-        "Fish don't just lose their home.\nThey lose their shelter, their food, their future.\n\n" +
-        "Your trash. Their extinction.",
-      itemType: "straw",
-    },
-
-    {
-      name: "Dolphin",
-      bg: loadImage("783D18C3-2A77-40C3-B7A0-8D0218BA5D65.PNG"),
-      plastic: loadImage("straw.png"),
-      bgX: -330,
-      bgY: -400,
-      dark: 45,
-      title1: "PLASTIC ",
-      title2: "POISONS",
-      title1Size: 135,
-      title2Size: 131,
-      title1Y: 850,
-      title2Y: 960,
-      title1Offset: -110,
-      title2Offset: -105,
-      sideText: [
-        "Every piece ",
-        "Of plastic ",
-        "You discard",
-        "Stays forever.",
-        "It contaminates.",
-        "It lingers.",
-      ],
-      thinkY: 629,
-      popupText:
-        "Plastic doesn't disappear.\nIt breaks into microplastics and poisons everything it touches.\n\n" +
-        "Dolphins absorb toxins through every fish they eat.\n" +
-        "Their immune systems collapse.\n" +
-        "Their calves are born poisoned.\n\n" +
-        "Your trash. Their extinction.",
-      itemType: "straw",
-    },
-  ];
-}
-
-/* =========================================================
-   PERFORMANCE HELPERS
-   ========================================================= */
-
-function applyPixelDensity() {
-  pixelDensity(min(2, window.devicePixelRatio || 1));
-}
-
-function removeAtFast(arr, index) {
-  let last = arr.length - 1;
-  if (index !== last) arr[index] = arr[last];
-  arr.pop();
-}
-
-function setAppCursor() {
-  cursor(HAND);
-}
-
-function initPosterState(index) {
-  let p = posters[index];
-  p.items = null;
-  p.collectedCount = 0;
-  p.timeLeft = 30;
-  p.lastSecondTime = millis();
-  p.showPopup = false;
-  p.showEndPopup = false;
-  p.confettiFired = false;
-  p._staticLayer = null;
-  p._cachedCountValue = -1;
-  p._cachedCountWidth = 0;
-}
-
-function ensurePosterItems(index) {
-  let p = posters[index];
-  if (p.plastic && !p.items) resetPoster(index);
-}
-
-function setActivePoster(index) {
-  activePoster = index;
-  ensurePosterItems(index);
-}
-
-function goToHome() {
-  appState = 'home';
-  setAppCursor();
-}
-
-function setup() {
-  let c = createCanvas(windowWidth, windowHeight);
-  c.elt.style.touchAction = 'none';
-  applyPixelDensity();
-  frameRate(30);
-
-  computeActiveTransform();
-  setupGalleryCards();
-
-  for (let i = 0; i < posters.length; i++) {
-    initPosterState(i);
-  }
-
-  visualCachesReady = false;
-  setAppCursor();
-}
-
-function ensureVisualCaches() {
-  if (visualCachesReady) return;
-
-  for (let i = 0; i < posters.length; i++) {
-    rebuildPosterStaticLayer(i);
-  }
-  rebuildHomeCaches();
-  visualCachesReady = true;
-}
-
-function windowResized() {
-  applyPixelDensity();
-  resizeCanvas(windowWidth, windowHeight);
-  computeActiveTransform();
-  visualCachesReady = false;
-  ensureVisualCaches();
-}
-
-function rebuildHomeCaches() {
-  rebuildHomeGradient();
-  rebuildDeckCache();
-}
-
-function rebuildHomeGradient() {
-  if (homeGradientCache) homeGradientCache.remove();
-  homeGradientCache = createGraphics(width, height);
-  homeGradientCache.pixelDensity(pixelDensity());
-
-  let g = homeGradientCache;
-  g.noStroke();
-  for (let i = 0; i < height; i += 4) {
-    let t = i / height;
-    let c = lerpColor(color(6, 22, 34), color(10, 40, 56), t);
-    g.fill(c);
-    g.rect(0, i, width, 4);
-  }
-}
-
-function rebuildDeckCache() {
-  if (deckCache) deckCache.remove();
-  deckCache = createGraphics(width, height);
-  deckCache.pixelDensity(pixelDensity());
-
-  let g = deckCache;
-  let { cardW, cardH, cx, cy } = getDeckGeometry();
-
-  for (let i = posters.length - 1; i >= 0; i--) {
-    let p = posters[i];
-    let depth = i;
-    let offX = depth * 6;
-    let offY = depth * 8;
-    let rotAmt = (depth - 2) * 0.025;
-
-    g.push();
-    g.translate(cx + offX - (posters.length - 1) * 3, cy + offY - (posters.length - 1) * 4);
-    g.rotate(rotAmt);
-
-    g.drawingContext.save();
-    g.drawingContext.beginPath();
-    g.drawingContext.roundRect ?
-      g.drawingContext.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 18) :
-      g.drawingContext.rect(-cardW / 2, -cardH / 2, cardW, cardH);
-    g.drawingContext.clip();
-
-    g.drawingContext.filter = 'blur(7px) brightness(0.55) saturate(1.1)';
-    let s = cardW / posterW;
-    g.push();
-    g.translate(-cardW / 2, -cardH / 2);
-    g.scale(s);
-    drawPosterBaseTo(g, p);
-    g.pop();
-    g.drawingContext.filter = 'none';
-
-    g.fill(8, 20, 30, depth === 0 ? 70 : 130);
-    g.noStroke();
-    g.rect(-cardW / 2, -cardH / 2, cardW, cardH);
-
-    g.drawingContext.restore();
-
-    g.noFill();
-    g.stroke(255, depth === 0 ? 200 : 90);
-    g.strokeWeight(depth === 0 ? 2 : 1);
-    g.rect(-cardW / 2, -cardH / 2, cardW, cardH, 18);
-
-    if (depth === 0) {
-      g.fill(255);
-      g.noStroke();
-      g.textAlign(CENTER, CENTER);
-      g.textFont(fontBold);
-      g.textSize(16);
-      g.text("5 POSTERS", 0, cardH / 2 - 28);
-      g.textFont(fontRegular);
-      g.textSize(11);
-      g.fill(255, 200);
-      g.text("Tap to begin", 0, cardH / 2 - 10);
-    }
-
-    g.pop();
-  }
-}
-
-function rebuildPosterStaticLayer(index) {
-  let p = posters[index];
-  if (!p._staticLayer) {
-    p._staticLayer = createGraphics(posterW, posterH);
-    p._staticLayer.pixelDensity(1);
-  }
-
-  let g = p._staticLayer;
-  g.clear();
-  drawPosterBaseTo(g, p);
-  drawPosterTextTo(g, p);
-}
-
-function computeActiveTransform() {
-  let s = min(width / posterW, height / posterH) * 0.98;
-  activeScale = s;
-  activeX = (width - posterW * s) / 2;
-  activeY = (height - posterH * s) / 2;
-}
-
-function setupGalleryCards() {
-  galleryCards = [];
-  for (let i = 0; i < posters.length; i++) {
-    galleryCards.push({ posterIndex: i });
-  }
-}
-
-/* =========================================================
-   FLOATING PLASTIC
-   ========================================================= */
-
-class FloatingPlastic {
-  constructor(poster, sizeType) {
-    this.poster = poster;
-    this.angle = random(-0.9, 0.9);
-    this._lastBoxAngle = this.angle;
-
-    if (poster.name === "Seal") {
-      if (sizeType === "large") this.w = random(360, 520);
-      else if (sizeType === "medium") this.w = random(250, 380);
-      else this.w = random(165, 260);
-      this.h = this.w * (poster.plastic.height / poster.plastic.width);
-      this.opacity = random(185, 255);
-      this.whiteLayerOpacity = random(65, 130);
-    } else if (poster.name === "Whale") {
-      if (sizeType === "large") this.w = random(340, 500);
-      else if (sizeType === "medium") this.w = random(240, 360);
-      else this.w = random(160, 250);
-      this.h = this.w * (poster.plastic.height / poster.plastic.width);
-      this.opacity = random(185, 255);
-      this.whiteLayerOpacity = random(65, 125);
-    } else if (poster.itemType === "bag") {
-      if (sizeType === "large") this.w = random(185, 270);
-      else if (sizeType === "medium") this.w = random(125, 190);
-      else this.w = random(85, 135);
-      this.h = this.w * 1.28;
-      this.opacity = random(85, 155);
-      this.whiteLayerOpacity = random(28, 60);
-    } else if (poster.itemType === "straw") {
-      if (sizeType === "large") this.w = random(280, 390);
-      else if (sizeType === "medium") this.w = random(190, 280);
-      else this.w = random(120, 190);
-      this.h = this.w * (poster.plastic.height / poster.plastic.width);
-      this.opacity = random(200, 255);
-      this.whiteLayerOpacity = random(55, 115);
-    } else {
-      if (sizeType === "large") this.w = random(190, 285);
-      else if (sizeType === "medium") this.w = random(130, 200);
-      else this.w = random(85, 140);
-      this.h = this.w * (poster.plastic.height / poster.plastic.width);
-      this.opacity = random(165, 245);
-      this.whiteLayerOpacity = random(40, 90);
-    }
-
-    this.fitInsidePoster();
-
-    this.vx = random(-0.35, 0.35);
-    this.vy = random(-0.25, 0.25);
-
-    if (abs(this.vx) < 0.06) this.vx = this.vx < 0 ? -0.06 : 0.06;
-    if (abs(this.vy) < 0.04) this.vy = this.vy < 0 ? -0.04 : 0.04;
-
-    this.rotationSpeed = random(-0.004, 0.004);
-    this.floatOffset = random(TWO_PI);
-    this.floatSpeed = random(0.01, 0.025);
-    this.floatAmount = random(0.15, 0.65);
-  }
-
-  refreshBoundingBox() {
-    this._boxW = abs(this.w * cos(this.angle)) + abs(this.h * sin(this.angle));
-    this._boxH = abs(this.w * sin(this.angle)) + abs(this.h * cos(this.angle));
-  }
-
-  fitInsidePoster() {
-    this.refreshBoundingBox();
-    this.x = random(this._boxW / 2 + 5, posterW - this._boxW / 2 - 5);
-    this.y = random(this._boxH / 2 + 5, posterH - this._boxH / 2 - 5);
-  }
-
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-
-    this.x += sin(frameCount * this.floatSpeed + this.floatOffset) * this.floatAmount;
-    this.y += cos(frameCount * this.floatSpeed + this.floatOffset) * this.floatAmount;
-
-    this.angle += this.rotationSpeed;
-
-    if (abs(this.angle - this._lastBoxAngle) > 0.02) {
-      this._lastBoxAngle = this.angle;
-      this.refreshBoundingBox();
-    }
-
-    if (this.x < this._boxW / 2 || this.x > posterW - this._boxW / 2) {
-      this.vx *= -1;
-      this.x = constrain(this.x, this._boxW / 2, posterW - this._boxW / 2);
-    }
-    if (this.y < this._boxH / 2 || this.y > posterH - this._boxH / 2) {
-      this.vy *= -1;
-      this.y = constrain(this.y, this._boxH / 2, posterH - this._boxH / 2);
-    }
-  }
-
-  isClicked(mx, my) {
-    let dx = mx - this.x;
-    let dy = my - this.y;
-    let ca = cos(-this.angle);
-    let sa = sin(-this.angle);
-    let lx = dx * ca - dy * sa;
-    let ly = dx * sa + dy * ca;
-    return abs(lx) < this.w * 0.62 && abs(ly) < this.h * 1.0;
-  }
-}
-
-function drawFloatingPlastics(items, poster) {
-  if (!items || !items.length || !poster.plastic) return;
-
-  blendMode(SCREEN);
-  for (let i = 0; i < items.length; i++) {
-    let item = items[i];
-    push();
-    translate(item.x, item.y);
-    rotate(item.angle);
-    tint(255, item.opacity);
-    image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
-    pop();
-  }
-
-  blendMode(LIGHTEST);
-  for (let i = 0; i < items.length; i++) {
-    let item = items[i];
-    push();
-    translate(item.x, item.y);
-    rotate(item.angle);
-    tint(255, 255, 255, item.whiteLayerOpacity);
-    image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
-    pop();
-  }
-
-  blendMode(BLEND);
-  noTint();
-}
-
-/* =========================================================
-   FEEDBACK: small collect particles + end-game confetti
-   ========================================================= */
-
-class CollectParticle {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.life = 255;
-    this.vy = -0.9;
-    this.vx = random(-0.3, 0.3);
-    this.scale = random(0.9, 1.3);
-  }
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.life -= 6;
-  }
-  draw() {
-    noStroke();
-    fill(255, 255, 255, this.life);
-    textSize(20 * this.scale);
-    text("+1", this.x, this.y);
-  }
-  isDead() {
-    return this.life <= 0;
-  }
-}
-
-class SparklePiece {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    let a = random(TWO_PI);
-    let sp = random(1.2, 3.2);
-    this.vx = cos(a) * sp;
-    this.vy = sin(a) * sp;
-    this.life = 255;
-    this.size = random(2, 5);
-    this.col = random([
-      [255, 255, 255],
-      [120, 220, 255],
-      [180, 255, 230],
-    ]);
-  }
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vy += 0.04;
-    this.life -= 8;
-  }
-  draw() {
-    noStroke();
-    fill(this.col[0], this.col[1], this.col[2], this.life);
-    ellipse(this.x, this.y, this.size);
-  }
-  isDead() {
-    return this.life <= 0;
-  }
-}
-
-function spawnCollectFeedback(x, y) {
-  particles.push(new CollectParticle(x, y));
-  for (let i = 0; i < 8; i++) particles.push(new SparklePiece(x, y));
-}
-
-function updateAndDrawParticles() {
-  if (!particles.length) return;
-
-  push();
-  textFont(fontBold);
-  textAlign(CENTER, CENTER);
-  for (let i = particles.length - 1; i >= 0; i--) {
-    particles[i].update();
-    particles[i].draw();
-    if (particles[i].isDead()) removeAtFast(particles, i);
-  }
-  pop();
-}
-
-class ConfettiPiece {
-  constructor() {
-    this.x = random(0, posterW);
-    this.y = random(-200, -20);
-    this.vy = random(2, 5);
-    this.vx = random(-1, 1);
-    this.size = random(6, 12);
-    this.rot = random(TWO_PI);
-    this.rotSpeed = random(-0.1, 0.1);
-    this.col = random([
-      [255, 195, 0],
-      [0, 200, 255],
-      [255, 90, 130],
-      [120, 255, 170],
-      [255, 255, 255],
-    ]);
-  }
-  update() {
-    this.y += this.vy;
-    this.x += this.vx;
-    this.rot += this.rotSpeed;
-  }
-  draw() {
-    noStroke();
-    fill(this.col[0], this.col[1], this.col[2]);
-    rect(0, 0, this.size, this.size * 0.5);
-  }
-}
-
-function updateAndDrawConfetti() {
-  if (!confetti.length) return;
-
-  push();
-  rectMode(CENTER);
-  for (let i = confetti.length - 1; i >= 0; i--) {
-    confetti[i].update();
-    push();
-    translate(confetti[i].x, confetti[i].y);
-    rotate(confetti[i].rot);
-    confetti[i].draw();
-    pop();
-    if (confetti[i].y > posterH + 40) removeAtFast(confetti, i);
-  }
-  rectMode(CORNER);
-  pop();
-}
-
-function spawnConfettiBurst() {
-  confetti = [];
-  for (let i = 0; i < 120; i++) confetti.push(new ConfettiPiece());
-}
-
-/* =========================================================
-   POSTER RESET
-   ========================================================= */
-
-function resetPoster(index) {
-  let p = posters[index];
-  if (!p.plastic) return;
-
-  p.items = [];
-  p.collectedCount = 0;
-  p.timeLeft = 30;
-  p.lastSecondTime = millis();
-  p.showPopup = false;
-  p.showEndPopup = false;
-  p.confettiFired = false;
-  p._cachedCountValue = -1;
-
-  if (p.name === "Seal" || p.name === "Whale") {
-    for (let i = 0; i < 36; i++) p.items.push(new FloatingPlastic(p, "large"));
-    for (let i = 0; i < 48; i++) p.items.push(new FloatingPlastic(p, "medium"));
-    for (let i = 0; i < 56; i++) p.items.push(new FloatingPlastic(p, "small"));
-  } else if (p.itemType === "bag") {
-    for (let i = 0; i < 24; i++) p.items.push(new FloatingPlastic(p, "large"));
-    for (let i = 0; i < 32; i++) p.items.push(new FloatingPlastic(p, "medium"));
-    for (let i = 0; i < 40; i++) p.items.push(new FloatingPlastic(p, "small"));
-  } else if (p.itemType === "straw") {
-    for (let i = 0; i < 26; i++) p.items.push(new FloatingPlastic(p, "large"));
-    for (let i = 0; i < 36; i++) p.items.push(new FloatingPlastic(p, "medium"));
-    for (let i = 0; i < 44; i++) p.items.push(new FloatingPlastic(p, "small"));
-  } else {
-    for (let i = 0; i < 24; i++) p.items.push(new FloatingPlastic(p, "large"));
-    for (let i = 0; i < 34; i++) p.items.push(new FloatingPlastic(p, "medium"));
-    for (let i = 0; i < 42; i++) p.items.push(new FloatingPlastic(p, "small"));
-  }
-}
-
-/* =========================================================
-   MAIN DRAW
-   ========================================================= */
-
-function draw() {
-  touchMoveHandledThisFrame = false;
-  ensureVisualCaches();
-  background(8, 18, 26);
-
-  if (appState === 'home') {
-    drawHomeScreen();
-  } else {
-    drawActivePoster();
-  }
-
-  if (presentationMode) {
-    drawPresentationFrame();
-  }
-
-  drawShareToast();
-}
-
-/* =========================================================
-   HOME SCREEN — headline + blurred stacked deck
-   ========================================================= */
-
-function drawHomeScreen() {
-  if (homeGradientCache) {
-    image(homeGradientCache, 0, 0);
-  }
-
-  push();
-  textAlign(CENTER, TOP);
-  textFont(fontBold);
-  let headSize = constrain(width * 0.09, 24, 40);
-  textSize(headSize);
-  fill(255);
-  text("EVERY PIECE\nYOU COLLECT\nSAVES A LIFE", width / 2, height * 0.07);
-
-  textFont(fontRegular);
-  textSize(constrain(width * 0.035, 12, 16));
-  fill(255, 200);
-  text("Tap the deck to start collecting plastic\nand turn it into real ocean donations", width / 2, height * 0.07 + headSize * 3.4);
-  pop();
-
-  if (deckCache) {
-    image(deckCache, 0, 0);
-  }
-
-  push();
-  textAlign(CENTER, CENTER);
-  textFont(fontRegular);
-  textSize(13);
-  let pulse = 150 + 80 * sin(frameCount * 0.06);
-  fill(255, pulse);
-  text("▲ Tap to open ▲", width / 2, height * 0.93);
-  pop();
-}
-
-function getDeckGeometry() {
-  let cardW = min(width * 0.62, 280);
-  let cardH = cardW * 1.5;
-  let cx = width / 2;
-  let cy = height * 0.55;
-  return { cardW, cardH, cx, cy };
-}
-
-function isTapOnDeck(mx, my) {
-  let { cardW, cardH, cx, cy } = getDeckGeometry();
-  return mx > cx - cardW / 2 - 10 && mx < cx + cardW / 2 + 10 &&
-         my > cy - cardH / 2 - 10 && my < cy + cardH / 2 + 10;
-}
-
-/* =========================================================
-   ACTIVE POSTER VIEW (with swipe navigation)
-   ========================================================= */
-
-function drawActivePoster() {
-  if (isDragging) {
-    slideOffset = lerp(slideOffset, slideTarget, 1);
-  } else if (abs(slideOffset - slideTarget) < 0.5) {
-    slideOffset = slideTarget;
-  } else {
-    slideOffset = lerp(slideOffset, slideTarget, 0.18);
-  }
-
-  fill(0, 0, 0, 230);
-  noStroke();
-  rect(0, 0, width, height);
-
-  drawSinglePoster(activePoster, slideOffset);
-
-  let neighborGap = posterW * activeScale * 1.06;
-  if (slideOffset > 2 && activePoster > 0) {
-    ensurePosterItems(activePoster - 1);
-    drawSinglePoster(activePoster - 1, slideOffset - neighborGap / activeScale);
-  }
-  if (slideOffset < -2 && activePoster < posters.length - 1) {
-    ensurePosterItems(activePoster + 1);
-    drawSinglePoster(activePoster + 1, slideOffset + neighborGap / activeScale);
-  }
-
-  drawDotsIndicator();
-}
-
-function drawSinglePoster(index, offsetXInPosterSpace) {
-  if (index < 0 || index >= posters.length) return;
-  let p = posters[index];
-  let isActive = index === activePoster;
-  let shouldUpdateItems = isActive && !p.showPopup && !p.showEndPopup && p.items;
-
-  push();
-  translate(activeX + offsetXInPosterSpace * activeScale, activeY);
-  scale(activeScale);
-
-  drawingContext.save();
-  drawingContext.beginPath();
-  drawingContext.rect(0, 0, posterW, posterH);
-  drawingContext.clip();
-
-  if (p._staticLayer) {
-    image(p._staticLayer, 0, 0);
-  } else {
-    drawPosterBase(p);
-    drawPosterText(p);
-  }
-
-  if (isActive && !p.showPopup && !p.showEndPopup) {
-    updateTimer(p);
-  }
-
-  if (p.items) {
-    if (shouldUpdateItems) {
-      for (let i = 0; i < p.items.length; i++) {
-        p.items[i].update();
-      }
-    }
-    drawFloatingPlastics(p.items, p);
-  }
-
-  drawUnifiedCounterAndTimer(p);
-  drawLearnMoreButton();
-
-  if (isActive) {
-    updateAndDrawParticles();
-  }
-
-  if (p.showPopup) drawPopup(p);
-
-  if (p.showEndPopup) {
-    if (p.collectedCount > 0 && !p.confettiFired) {
-      spawnConfettiBurst();
-      p.confettiFired = true;
-    }
-    if (p.collectedCount > 0) {
-      updateAndDrawConfetti();
-    }
-    drawEndPopup(p);
-  }
-
-  drawPosterCloseX();
-
-  drawingContext.restore();
-
-  noFill();
-  stroke(255, 190);
-  strokeWeight(2);
-  rect(0, 0, posterW, posterH);
-
-  pop();
-}
-
-function drawDotsIndicator() {
-  let n = posters.length;
-  let spacing = 22;
-  let totalW = (n - 1) * spacing;
-  let startX = width / 2 - totalW / 2;
-  let y = activeY + posterH * activeScale + 26;
-  if (y > height - 16) y = height - 16;
-
-  push();
-  noStroke();
-  for (let i = 0; i < n; i++) {
-    let x = startX + i * spacing;
-    if (i === activePoster) {
-      fill(255);
-      ellipse(x, y, 11, 11);
-    } else {
-      fill(255, 110);
-      ellipse(x, y, 7, 7);
-    }
-  }
-  pop();
-}
-
-/* =========================================================
-   POSTER BASE / TEXT (layout updated: text left, HUD right)
-   ========================================================= */
-
-function drawPosterBaseTo(ctx, p) {
-  ctx.push();
-  ctx.fill(50);
-  ctx.noStroke();
-  ctx.rect(0, 0, posterW, posterH);
-
-  ctx.imageMode(CORNER);
-  ctx.image(p.bg, p.bgX, p.bgY);
-
-  ctx.fill(0, 0, 0, p.dark);
-  ctx.noStroke();
-  ctx.rect(0, 0, posterW, posterH);
-  ctx.pop();
-}
-
-function drawPosterBase(p) {
-  push();
-  fill(50);
-  noStroke();
-  rect(0, 0, posterW, posterH);
-
-  imageMode(CORNER);
-  image(p.bg, p.bgX, p.bgY);
-
-  fill(0, 0, 0, p.dark);
-  noStroke();
-  rect(0, 0, posterW, posterH);
-  pop();
-}
-
-function drawPosterTextTo(ctx, p) {
-  ctx.push();
-  ctx.textFont(fontBold);
-  ctx.textSize(p.title1Size);
-  ctx.fill(255);
-  ctx.text(p.title1, 11, p.title1Y + p.title1Offset);
-
-  ctx.textSize(p.title2Size);
-  ctx.text(p.title2, 11, p.title2Y + p.title2Offset);
-
-  ctx.textFont(fontRegular);
-  ctx.textSize(24);
-  ctx.text("USE LESS.", 20, 760);
-  ctx.text("THROW BETTER.", 20, 787);
-  ctx.text("ACT NOW.", 20, 814);
-
-  ctx.textSize(18);
-  for (let i = 0; i < p.sideText.length; i++) {
-    ctx.text(p.sideText[i], 24, 50 + i * 22);
-  }
-
-  ctx.textSize(20);
-  ctx.text("THINK BEFORE YOU THROW", 20, 712);
-  ctx.pop();
-}
-
-function drawPosterText(p) {
-  push();
-  textFont(fontBold);
-  textSize(p.title1Size);
-  fill(255);
-  text(p.title1, 11, p.title1Y + p.title1Offset);
-
-  textSize(p.title2Size);
-  text(p.title2, 11, p.title2Y + p.title2Offset);
-
-  textFont(fontRegular);
-  textSize(24);
-  text("USE LESS.", 20, 760);
-  text("THROW BETTER.", 20, 787);
-  text("ACT NOW.", 20, 814);
-
-  textSize(18);
-  for (let i = 0; i < p.sideText.length; i++) {
-    text(p.sideText[i], 24, 50 + i * 22);
-  }
-
-  textSize(20);
-  text("THINK BEFORE YOU THROW", 20, 712);
-  pop();
-}
-
-/* =========================================================
-   COUNTER + TIMER — now on the RIGHT, redesigned
-   ========================================================= */
-
-function drawUnifiedCounterAndTimer(p) {
-  push();
-
-  let hudW = 175;
-  let hudH = 76;
-  let hudX = posterW - hudW - 18;
-  let hudY = 18;
-
-  fill(10, 60, 90, 215);
-  stroke(255, 255, 255, 170);
-  strokeWeight(1.5);
-  rect(hudX, hudY, hudW, hudH, 16);
-
-  fill(255, 255, 255, 18);
-  noStroke();
-  rect(hudX, hudY, hudW, hudH / 2, 16, 16, 0, 0);
-
-  textFont(fontRegular);
-  textAlign(LEFT, TOP);
-  fill(255, 200);
-  textSize(11);
-  text("PLASTIC COLLECTED", hudX + 14, hudY + 8);
-
-  fill(255);
-  textFont(fontBold);
-  textAlign(LEFT, CENTER);
-  textSize(30);
-  text(p.collectedCount, hudX + 14, hudY + 38);
-
-  if (p.collectedCount !== p._cachedCountValue) {
-    textFont(fontBold);
-    textSize(30);
-    p._cachedCountWidth = textWidth(String(p.collectedCount));
-    p._cachedCountValue = p.collectedCount;
-  }
-
-  textFont(fontRegular);
-  textSize(13);
-  fill(190, 230, 255);
-  text("pcs", hudX + 22 + p._cachedCountWidth, hudY + 40);
-
-  stroke(255, 90);
-  strokeWeight(1);
-  line(hudX + 14, hudY + 54, hudX + hudW - 14, hudY + 54);
-
-  noStroke();
-  fill(255, 210);
-  textFont(fontRegular);
-  textAlign(LEFT, CENTER);
-  textSize(13);
-  text("⏱ " + p.timeLeft + "s left", hudX + 14, hudY + 65);
-
-  pop();
-}
-
-function updateTimer(p) {
-  if (millis() - p.lastSecondTime >= 1000) {
-    p.timeLeft--;
-    p.lastSecondTime = millis();
-
-    if (p.timeLeft <= 0) {
-      p.timeLeft = 0;
-      p.showEndPopup = true;
-    }
-  }
-}
-
-/* =========================================================
-   LEARN MORE — redesigned as a real chip/button
-   ========================================================= */
-
-function drawLearnMoreButton() {
-  push();
-
-  let hovering = false;
-
-  fill(255, 255, 255, hovering ? 235 : 210);
-  stroke(255);
-  strokeWeight(1.2);
-  rect(btnX, btnY, btnW, btnH, 22);
-
-  noStroke();
-  fill(10, 40, 60);
-  textFont(fontBold);
-  textAlign(CENTER, CENTER);
-  textSize(14);
-  text("ℹ  Learn more", btnX + btnW / 2, btnY + btnH / 2 + 1);
-
-  pop();
-}
-
-function isMouseOverButton(mx, my) {
-  return mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH;
-}
-
-function drawPosterCloseX() {
-  push();
-  fill(255);
-  noStroke();
-  textFont(fontRegular);
-  textSize(28);
-  textAlign(CENTER, CENTER);
-  text("X", posterW - 37, 39);
-  pop();
-}
-
-function isMouseOverPosterCloseX(mx, my) {
-  return mx >= posterW - 58 && mx <= posterW - 16 && my >= 17 && my <= 58;
-}
-
-/* =========================================================
-   LEARN-MORE POPUP (unchanged visuals, same logic)
-   ========================================================= */
-
-function drawPopup(p) {
-  push();
-
-  fill(0, 0, 0, 120);
-  noStroke();
-  rect(0, 0, posterW, posterH);
-
-  let popX = 50;
-  let popY = 200;
-  let popW = 550;
-  let popH = 500;
-
-  fill(10, 60, 90, 210);
-  stroke(255, 255, 255, 180);
-  strokeWeight(2);
-  rect(popX, popY, popW, popH, 15);
-
-  fill(255, 255, 255, 15);
-  noStroke();
-  rect(popX, popY, popW, popH / 2, 15, 15, 0, 0);
-
-  fill(255);
-  noStroke();
-  textFont(fontRegular);
-  textSize(24);
-  textAlign(LEFT, BASELINE);
-  text("X", popX + popW - 30, popY + 35);
-
-  textFont(fontBold);
-  textSize(22);
-  textAlign(LEFT, TOP);
-  text("THE OCEAN IS NOT A TRASH CAN.", popX + 30, popY + 60, popW - 60);
-
-  stroke(255);
-  strokeWeight(1.5);
-  line(popX + 30, popY + 105, popX + popW - 30, popY + 105);
-  noStroke();
-
-  textFont(fontRegular);
-  textSize(16);
-  fill(255);
-  textAlign(LEFT, TOP);
-  textWrap(WORD);
-  text(p.popupText, popX + 30, popY + 150, popW - 60);
-
-  pop();
-}
-
-/* =========================================================
-   END POPUP — persuasive empty state + share buttons
-   ========================================================= */
-
-function drawEndPopup(p) {
-  push();
-
-  fill(0, 0, 0, 170);
-  noStroke();
-  rect(0, 0, posterW, posterH);
-
-  let popX = 45;
-  let popY = 230;
-  let popW = 560;
-  let popH = 500;
-
-  fill(10, 60, 90, 235);
-  stroke(255, 255, 255, 200);
-  strokeWeight(2);
-  rect(popX, popY, popW, popH, 18);
-
-  fill(255, 255, 255, 18);
-  noStroke();
-  rect(popX, popY, popW, popH / 2, 18, 18, 0, 0);
-
-  fill(255);
-  textFont(fontRegular);
-  textSize(28);
-  textAlign(CENTER, CENTER);
-  text("X", popX + popW - 35, popY + 35);
-
-  textAlign(CENTER, TOP);
-
-  if (p.collectedCount > 0) {
-    textFont(fontBold);
-    textSize(32);
-    fill(255);
-    text("Mission accomplished!", popX + popW / 2, popY + 80, popW - 60);
-
-    textFont(fontRegular);
-    textSize(19);
-    textWrap(WORD);
-    text(
-      "The " + p.collectedCount + " plastic units you collected equal $" +
-        p.collectedCount + " donated to protecting marine life and cleaning our oceans.",
-      popX + 55, popY + 155, popW - 110
-    );
-  } else {
-    textFont(fontBold);
-    textSize(28);
-    textLeading(36);
-    fill(255);
-    text("The ocean needed you.", popX + 40, popY + 75, popW - 80, 90);
-
-    textFont(fontRegular);
-    textSize(19);
-    textLeading(28);
-    textWrap(WORD);
-    text(
-      "Right now, real animals are choking, starving and dying from plastic just like what you saw here. " +
-      "You collected nothing this time — but it's not too late to make a difference.",
-      popX + 55, popY + 150, popW - 110
-    );
-  }
-
-  let btnAW = 220, btnAH = 50;
-  let btnAX = popX + popW / 2 - btnAW / 2;
-  let btnAY = popY + popH - 170;
-
-  fill(255);
-  noStroke();
-  rect(btnAX, btnAY, btnAW, btnAH, 25);
-  fill(10, 60, 90);
-  textFont(fontBold);
-  textSize(17);
-  textAlign(CENTER, CENTER);
-  text(p.collectedCount > 0 ? "🔁 Play again" : "🔁 Try again", btnAX + btnAW / 2, btnAY + btnAH / 2 + 1);
-
-  p._tryAgainBox = { x: btnAX, y: btnAY, w: btnAW, h: btnAH };
-
-  let btnSW = 220, btnSH = 50;
-  let btnSX = popX + popW / 2 - btnSW / 2;
-  let btnSY = btnAY + btnAH + 16;
-
-  fill(40, 170, 220);
-  noStroke();
-  rect(btnSX, btnSY, btnSW, btnSH, 25);
-  fill(255);
-  textFont(fontBold);
-  textSize(17);
-  textAlign(CENTER, CENTER);
-  text("📤 Share with friends", btnSX + btnSW / 2, btnSY + btnSH / 2 + 1);
-
-  p._shareBox = { x: btnSX, y: btnSY, w: btnSW, h: btnSH };
-
-  pop();
-}
-
-function isMouseOverEndCloseBox(mx, my) {
-  return mx >= 560 && mx <= 605 && my >= 280 && my <= 325;
-}
-
-function isMouseOverCloseBox(mx, my) {
-  return mx >= 550 && mx <= 590 && my >= 210 && my <= 250;
-}
-
-/* =========================================================
-   SHARE FEATURE
-   ========================================================= */
-
-function buildShareText(p) {
-  return "I collected " + p.collectedCount + " pieces of plastic and donated $" +
-    p.collectedCount + " to ocean conservation. Can you beat me?";
-}
-
-function doShare(p) {
-  let text = buildShareText(p);
-
-  if (navigator.share) {
-    navigator.share({ title: "Ocean Plastic Challenge", text: text }).catch(() => {});
-  } else if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      showShareToast("Copied!");
-    }).catch(() => {
-      showShareToast(text);
-    });
-  } else {
-    showShareToast(text);
-  }
-}
-
-function showShareToast(msg) {
-  shareMsg = msg;
-  shareMsgTimer = 150;
-}
-
-function drawShareToast() {
-  if (shareMsgTimer <= 0) return;
-  shareMsgTimer--;
-
-  push();
-  let alpha = min(255, shareMsgTimer * 6);
-  let toastW = min(width * 0.85, 360);
-  let toastX = width / 2 - toastW / 2;
-  let toastY = height - 90;
-
-  fill(20, 20, 20, alpha * 0.9);
-  noStroke();
-  rect(toastX, toastY, toastW, 50, 14);
-
-  fill(255, alpha);
-  textFont(fontRegular);
-  textSize(13);
-  textAlign(CENTER, CENTER);
-  textWrap(WORD);
-  text(shareMsg, toastX + toastW / 2, toastY + 25, toastW - 24);
-  pop();
-}
-
-/* =========================================================
-   COLLECTING PLASTIC
-   ========================================================= */
-
-function collectPlasticAt(p, mx, my) {
-  if (p.showEndPopup || !p.items) return;
-
-  for (let i = p.items.length - 1; i >= 0; i--) {
-    if (p.items[i].isClicked(mx, my)) {
-      let item = p.items[i];
-      p.items.splice(i, 1);
-      p.collectedCount++;
-      p._cachedCountValue = -1;
-      spawnCollectFeedback(item.x, item.y);
-      return;
-    }
-  }
-}
-
-/* =========================================================
-   PRESENTATION / MOCKUP MODE
-   ========================================================= */
-
-function drawPresentationFrame() {
-  push();
-  noFill();
-  stroke(0);
-  strokeWeight(18);
-  rect(9, 9, width - 18, height - 18, 46);
-
-  stroke(60);
-  strokeWeight(3);
-  rect(20, 20, width - 40, height - 40, 36);
-
-  noStroke();
-  fill(0);
-  rectMode(CENTER);
-  rect(width / 2, 30, 90, 18, 10);
-  rectMode(CORNER);
-
-  fakeFingerT += 0.02;
-  let fx = width / 2 + sin(fakeFingerT) * width * 0.18;
-  let fy = height * 0.7 + cos(fakeFingerT * 1.3) * height * 0.06;
-  noStroke();
-  fill(255, 200, 120, 90);
-  ellipse(fx, fy, 46, 46);
-  fill(255, 200, 120, 160);
-  ellipse(fx, fy, 18, 18);
-
-  pop();
-}
-
-/* =========================================================
-   INPUT HANDLING (mouse + touch, with swipe)
-   ========================================================= */
-
-function mousePressed() {
-  dragDeltaForTap = 0;
-
-  if (appState === 'home') {
-    if (isTapOnDeck(mouseX, mouseY)) {
-      appState = 'poster';
-      slideOffset = 0;
-      slideTarget = 0;
-      setActivePoster(0);
-      setAppCursor();
-    }
-    return;
-  }
-
-  dragStartX = mouseX;
-  dragStartY = mouseY;
-  dragStartOffset = slideOffset;
-  isDragging = false;
-  swipeLocked = false;
-}
-
-function mouseDragged() {
-  if (appState !== 'poster') return;
-  if (swipeLocked) return;
-
-  let dx = mouseX - dragStartX;
-  let dy = mouseY - dragStartY;
-
-  if (!isDragging) {
-    if (abs(dx) > 14 && abs(dx) > abs(dy) * 1.4) {
-      isDragging = true;
-    } else if (abs(dy) > 14) {
-      swipeLocked = true;
-      return;
-    } else {
-      return;
-    }
-  }
-
-  dragDeltaForTap = dx;
-  slideOffset = dragStartOffset + dx / activeScale;
-}
-
-function mouseReleased() {
-  if (appState !== 'poster') return;
-
-  if (isDragging) {
-    isDragging = false;
-
-    let threshold = 60;
-    if (dragDeltaForTap > threshold && activePoster > 0) {
-      setActivePoster(activePoster - 1);
-      slideOffset = -(posterW * 1.06);
-      slideTarget = 0;
-    } else if (dragDeltaForTap < -threshold && activePoster < posters.length - 1) {
-      setActivePoster(activePoster + 1);
-      slideOffset = (posterW * 1.06);
-      slideTarget = 0;
-    } else {
-      slideTarget = 0;
-    }
-  } else {
-    handlePosterTap(mouseX, mouseY);
-  }
-
-  dragDeltaForTap = 0;
-  swipeLocked = false;
-}
-
-function handlePosterTap(screenX, screenY) {
-  let p = posters[activePoster];
-
-  let mx = (screenX - activeX) / activeScale - slideOffset;
-  let my = (screenY - activeY) / activeScale;
-
-  if (mx < 0 || mx > posterW || my < 0 || my > posterH) return;
-
-  if (isMouseOverPosterCloseX(mx, my)) {
-    goToHome();
-    return;
-  }
-
-  if (p.showEndPopup) {
-    if (p._tryAgainBox && pointInBox(mx, my, p._tryAgainBox)) {
-      resetPoster(activePoster);
-      return;
-    }
-    if (p._shareBox && pointInBox(mx, my, p._shareBox)) {
-      doShare(p);
-      return;
-    }
-    if (isMouseOverEndCloseBox(mx, my)) {
-      resetPoster(activePoster);
-    }
-    return;
-  }
-
-  if (p.showPopup) {
-    if (isMouseOverCloseBox(mx, my) || mx < 50 || mx > 600 || my < 200 || my > 700) {
-      p.showPopup = false;
-      p.lastSecondTime = millis();
-    }
-    return;
-  }
-
-  if (isMouseOverButton(mx, my)) {
-    p.showPopup = true;
-    return;
-  }
-
-  collectPlasticAt(p, mx, my);
-}
-
-function pointInBox(x, y, box) {
-  return x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
-}
-
-function touchStarted() {
-  mousePressed();
-  return false;
-}
-
-function touchMoved() {
-  if (touchMoveHandledThisFrame) return false;
-  touchMoveHandledThisFrame = true;
-  mouseDragged();
-  return false;
-}
-
-function touchEnded() {
-  mouseReleased();
-  return false;
-}
-
-function keyPressed() {
-  if (key === 'm' || key === 'M') {
-    presentationMode = !presentationMode;
-  }
-  if (key === 'ArrowLeft' && appState === 'poster' && activePoster > 0) {
-    setActivePoster(activePoster - 1);
-  }
-  if (key === 'ArrowRight' && appState === 'poster' && activePoster < posters.length - 1) {
-    setActivePoster(activePoster + 1);
-  }
-  if (key === 'Escape') {
-    goToHome();
-  }
-}
+   let fontRegular;
+   let fontBold;
+   
+   let posters = [];
+   let activePoster = -1; // -1 = home screen
+   
+   let posterW = 650;
+   let posterH = 975;
+   
+   let activeScale = 1;
+   let activeX;
+   let activeY;
+   
+   // "Learn more" chip button geometry (inside poster space)
+   let btnX = 30;
+   let btnY = 895;
+   let btnW = 150;
+   let btnH = 42;
+   
+   // App state: 'home' | 'poster'
+   let appState = 'home';
+   
+   // swipe / slide transition between posters (poster view)
+   let slideOffset = 0;       // current horizontal slide offset (px, in poster space)
+   let slideTarget = 0;
+   let isDragging = false;
+   let dragStartX = 0;
+   let dragStartY = 0;
+   let dragStartOffset = 0;
+   let dragDeltaForTap = 0;
+   let swipeLocked = false;
+   
+   // swipe / slide transition for HOME carousel
+   let homeIndex = 0;
+   let homeSlideOffset = 0;   // in poster-space px (consistent w/ home card scale)
+   let homeSlideTarget = 0;
+   
+   // presentation / mockup mode
+   let presentationMode = false;
+   let fakeFingerT = 0;
+   
+   // particles + confetti
+   let particles = [];
+   let confetti = [];
+   
+   // share feedback
+   let shareMsg = '';
+   let shareMsgTimer = 0;
+   
+   // performance caches
+   let homeGradientCache = null;
+   let visualCachesReady = false;
+   let touchMoveHandledThisFrame = false;
+   
+   function preload() {
+     fontRegular = loadFont("ArchivoBlack-Regular.ttf");
+     fontBold = loadFont("Bungee-Regular.ttf");
+   
+     posters = [
+       {
+         name: "Seal",
+         bg: loadImage("seal.png"),
+         plastic: loadImage("Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png"),
+         bgX: -100,
+         bgY: -300,
+         dark: 70,
+         title1: "PLASTIC ",
+         title2: "SUFFOCATES",
+         title1Size: 135,
+         title2Size: 94,
+         title1Y: 865,
+         title2Y: 960,
+         title1Offset: -99,
+         title2Offset: -105,
+         sideText: [
+           "Every piece ",
+           "Of plastic ",
+           "You discard",
+           "Stays forever.",
+           "It tightens.",
+           "It strangles.",
+         ],
+         thinkY: 655,
+         popupText:
+           "Seals, sea lions and other animals can't tell plastic from jellyfish.\nThey swallow it. They choke on it. They die from it.\n\n" +
+           "They struggle for hours. For days.\nUntil they can't anymore.\n\n" +
+           "Your trash. Their extinction.",
+         itemType: "plastic",
+       },
+   
+       {
+         name: "Whale",
+         bg: loadImage("whale.png"),
+         plastic: loadImage("Gemini_Generated_Image_2rijc92rijc92rij.png"),
+         bgX: -330,
+         bgY: -90,
+         dark: 70,
+         title1: "PLASTIC ",
+         title2: "STARVES",
+         title1Size: 135,
+         title2Size: 131,
+         title1Y: 841,
+         title2Y: 960,
+         title1Offset: -99,
+         title2Offset: -105,
+         sideText: [
+           "Every piece ",
+           "Of plastic ",
+           "You discard",
+           "Stays forever.",
+           "It is swallowed.",
+           "It starves.",
+         ],
+         thinkY: 631,
+         popupText:
+           "Whales swallow hundreds of plastic pieces a day.\nTheir stomachs fill up but they get no nutrition.\nThey feel full. They stop eating. They starve.\n\n" +
+           "Seabirds feed plastic to their chicks.\nSea turtles, fish, whales, all dying hungry.\nWith stomachs full of your trash.\n\n" +
+           "Your trash. Their extinction.",
+         itemType: "plastic",
+       },
+   
+       {
+         name: "Sea Turtle",
+         bg: loadImage("9B31B070-C374-4143-858F-F08E009188A7 (1).PNG"),
+         plastic: loadImage("bag.png"),
+         bgX: -100,
+         bgY: -300,
+         dark: 70,
+         title1: "PLASTIC ",
+         title2: "ENTANGLES",
+         title1Size: 135,
+         title2Size: 101,
+         title1Y: 860,
+         title2Y: 960,
+         title1Offset: -99,
+         title2Offset: -105,
+         sideText: [
+           "Every piece ",
+           "Of plastic ",
+           "You discard",
+           "Stays forever.",
+           "It traps.",
+           "It hurts.",
+         ],
+         thinkY: 649,
+         popupText:
+           "Sea turtles and other marine animals are injured by plastic every day.\n\n" +
+           "Nets, rings and other sharp objects trap and kill them.\nSlowly. Tightly. Without mercy.\n\n" +
+           "Your trash. Their extinction.",
+         itemType: "bag",
+       },
+   
+       {
+         name: "Fish",
+         bg: loadImage("nemo.png"),
+         plastic: loadImage("plate1.png"),
+         bgX: -140,
+         bgY: -370,
+         dark: 45,
+         title1: "PLASTIC ",
+         title2: "DESTROYS",
+         title1Size: 135,
+         title2Size: 113,
+         title1Y: 841,
+         title2Y: 960,
+         title1Offset: -92,
+         title2Offset: -105,
+         sideText: [
+           "Every piece ",
+           "Of plastic ",
+           "You discard",
+           "Stays forever.",
+           "It invades.",
+           "It buries.",
+         ],
+         thinkY: 639,
+         popupText:
+           "Plastic smothers coral reefs.\nIt blocks sunlight. It kills algae.\nWithout algae there is no reef. Without reef there are no fish.\n\n" +
+           "Fish don't just lose their home.\nThey lose their shelter, their food, their future.\n\n" +
+           "Your trash. Their extinction.",
+         itemType: "straw",
+       },
+   
+       {
+         name: "Dolphin",
+         bg: loadImage("783D18C3-2A77-40C3-B7A0-8D0218BA5D65.PNG"),
+         plastic: loadImage("straw.png"),
+         bgX: -330,
+         bgY: -400,
+         dark: 45,
+         title1: "PLASTIC ",
+         title2: "POISONS",
+         title1Size: 135,
+         title2Size: 131,
+         title1Y: 850,
+         title2Y: 960,
+         title1Offset: -110,
+         title2Offset: -105,
+         sideText: [
+           "Every piece ",
+           "Of plastic ",
+           "You discard",
+           "Stays forever.",
+           "It contaminates.",
+           "It lingers.",
+         ],
+         thinkY: 629,
+         popupText:
+           "Plastic doesn't disappear.\nIt breaks into microplastics and poisons everything it touches.\n\n" +
+           "Dolphins absorb toxins through every fish they eat.\n" +
+           "Their immune systems collapse.\n" +
+           "Their calves are born poisoned.\n\n" +
+           "Your trash. Their extinction.",
+         itemType: "straw",
+       },
+     ];
+   }
+   
+   /* =========================================================
+      PERFORMANCE HELPERS
+      ========================================================= */
+   
+   function applyPixelDensity() {
+     pixelDensity(min(2, window.devicePixelRatio || 1));
+   }
+   
+   function removeAtFast(arr, index) {
+     let last = arr.length - 1;
+     if (index !== last) arr[index] = arr[last];
+     arr.pop();
+   }
+   
+   function setAppCursor() {
+     cursor(HAND);
+   }
+   
+   function initPosterState(index) {
+     let p = posters[index];
+     p.items = null;
+     p.collectedCount = 0;
+     p.timeLeft = 30;
+     p.lastSecondTime = millis();
+     p.showPopup = false;
+     p.showEndPopup = false;
+     p.confettiFired = false;
+     p._staticLayer = null;
+     p._cachedCountValue = -1;
+     p._cachedCountWidth = 0;
+   }
+   
+   function ensurePosterItems(index) {
+     let p = posters[index];
+     if (p.plastic && !p.items) resetPoster(index);
+   }
+   
+   function setActivePoster(index) {
+     activePoster = index;
+     ensurePosterItems(index);
+   }
+   
+   function goToHome() {
+     appState = 'home';
+     setAppCursor();
+   }
+   
+   function setup() {
+     let c = createCanvas(windowWidth, windowHeight);
+     c.elt.style.touchAction = 'none';
+     applyPixelDensity();
+     frameRate(30);
+   
+     computeActiveTransform();
+   
+     for (let i = 0; i < posters.length; i++) {
+       initPosterState(i);
+     }
+   
+     visualCachesReady = false;
+     setAppCursor();
+   }
+   
+   function ensureVisualCaches() {
+     if (visualCachesReady) return;
+   
+     for (let i = 0; i < posters.length; i++) {
+       rebuildPosterStaticLayer(i);
+     }
+     rebuildHomeCaches();
+     visualCachesReady = true;
+   }
+   
+   function windowResized() {
+     applyPixelDensity();
+     resizeCanvas(windowWidth, windowHeight);
+     computeActiveTransform();
+     visualCachesReady = false;
+     ensureVisualCaches();
+   }
+   
+   function rebuildHomeCaches() {
+     rebuildHomeGradient();
+   }
+   
+   function rebuildHomeGradient() {
+     if (homeGradientCache) homeGradientCache.remove();
+     homeGradientCache = createGraphics(width, height);
+     homeGradientCache.pixelDensity(pixelDensity());
+   
+     let g = homeGradientCache;
+     g.noStroke();
+     for (let i = 0; i < height; i += 4) {
+       let t = i / height;
+       let c = lerpColor(color(6, 22, 34), color(10, 40, 56), t);
+       g.fill(c);
+       g.rect(0, i, width, 4);
+     }
+   }
+   
+   function rebuildPosterStaticLayer(index) {
+     let p = posters[index];
+     if (!p._staticLayer) {
+       p._staticLayer = createGraphics(posterW, posterH);
+       p._staticLayer.pixelDensity(1);
+     }
+   
+     let g = p._staticLayer;
+     g.clear();
+     drawPosterBaseTo(g, p);
+     drawPosterTextTo(g, p);
+   }
+   
+   function computeActiveTransform() {
+     let s = min(width / posterW, height / posterH) * 0.98;
+     activeScale = s;
+     activeX = (width - posterW * s) / 2;
+     activeY = (height - posterH * s) / 2;
+   }
+   
+   /* =========================================================
+      FLOATING PLASTIC
+      ========================================================= */
+   
+   class FloatingPlastic {
+     constructor(poster, sizeType) {
+       this.poster = poster;
+       this.angle = random(-0.9, 0.9);
+       this._lastBoxAngle = this.angle;
+   
+       if (poster.name === "Seal") {
+         if (sizeType === "large") this.w = random(360, 520);
+         else if (sizeType === "medium") this.w = random(250, 380);
+         else this.w = random(165, 260);
+         this.h = this.w * (poster.plastic.height / poster.plastic.width);
+         this.opacity = random(185, 255);
+         this.whiteLayerOpacity = random(65, 130);
+       } else if (poster.name === "Whale") {
+         if (sizeType === "large") this.w = random(340, 500);
+         else if (sizeType === "medium") this.w = random(240, 360);
+         else this.w = random(160, 250);
+         this.h = this.w * (poster.plastic.height / poster.plastic.width);
+         this.opacity = random(185, 255);
+         this.whiteLayerOpacity = random(65, 125);
+       } else if (poster.itemType === "bag") {
+         if (sizeType === "large") this.w = random(185, 270);
+         else if (sizeType === "medium") this.w = random(125, 190);
+         else this.w = random(85, 135);
+         this.h = this.w * 1.28;
+         this.opacity = random(85, 155);
+         this.whiteLayerOpacity = random(28, 60);
+       } else if (poster.itemType === "straw") {
+         if (sizeType === "large") this.w = random(280, 390);
+         else if (sizeType === "medium") this.w = random(190, 280);
+         else this.w = random(120, 190);
+         this.h = this.w * (poster.plastic.height / poster.plastic.width);
+         this.opacity = random(200, 255);
+         this.whiteLayerOpacity = random(55, 115);
+       } else {
+         if (sizeType === "large") this.w = random(190, 285);
+         else if (sizeType === "medium") this.w = random(130, 200);
+         else this.w = random(85, 140);
+         this.h = this.w * (poster.plastic.height / poster.plastic.width);
+         this.opacity = random(165, 245);
+         this.whiteLayerOpacity = random(40, 90);
+       }
+   
+       this.fitInsidePoster();
+   
+       this.vx = random(-0.35, 0.35);
+       this.vy = random(-0.25, 0.25);
+   
+       if (abs(this.vx) < 0.06) this.vx = this.vx < 0 ? -0.06 : 0.06;
+       if (abs(this.vy) < 0.04) this.vy = this.vy < 0 ? -0.04 : 0.04;
+   
+       this.rotationSpeed = random(-0.004, 0.004);
+       this.floatOffset = random(TWO_PI);
+       this.floatSpeed = random(0.01, 0.025);
+       this.floatAmount = random(0.15, 0.65);
+     }
+   
+     refreshBoundingBox() {
+       this._boxW = abs(this.w * cos(this.angle)) + abs(this.h * sin(this.angle));
+       this._boxH = abs(this.w * sin(this.angle)) + abs(this.h * cos(this.angle));
+     }
+   
+     fitInsidePoster() {
+       this.refreshBoundingBox();
+       this.x = random(this._boxW / 2 + 5, posterW - this._boxW / 2 - 5);
+       this.y = random(this._boxH / 2 + 5, posterH - this._boxH / 2 - 5);
+     }
+   
+     update() {
+       this.x += this.vx;
+       this.y += this.vy;
+   
+       this.x += sin(frameCount * this.floatSpeed + this.floatOffset) * this.floatAmount;
+       this.y += cos(frameCount * this.floatSpeed + this.floatOffset) * this.floatAmount;
+   
+       this.angle += this.rotationSpeed;
+   
+       if (abs(this.angle - this._lastBoxAngle) > 0.02) {
+         this._lastBoxAngle = this.angle;
+         this.refreshBoundingBox();
+       }
+   
+       if (this.x < this._boxW / 2 || this.x > posterW - this._boxW / 2) {
+         this.vx *= -1;
+         this.x = constrain(this.x, this._boxW / 2, posterW - this._boxW / 2);
+       }
+       if (this.y < this._boxH / 2 || this.y > posterH - this._boxH / 2) {
+         this.vy *= -1;
+         this.y = constrain(this.y, this._boxH / 2, posterH - this._boxH / 2);
+       }
+     }
+   
+     isClicked(mx, my) {
+       let dx = mx - this.x;
+       let dy = my - this.y;
+       let ca = cos(-this.angle);
+       let sa = sin(-this.angle);
+       let lx = dx * ca - dy * sa;
+       let ly = dx * sa + dy * ca;
+       return abs(lx) < this.w * 0.62 && abs(ly) < this.h * 1.0;
+     }
+   }
+   
+   function drawFloatingPlastics(items, poster) {
+     if (!items || !items.length || !poster.plastic) return;
+   
+     blendMode(SCREEN);
+     for (let i = 0; i < items.length; i++) {
+       let item = items[i];
+       push();
+       translate(item.x, item.y);
+       rotate(item.angle);
+       tint(255, item.opacity);
+       image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
+       pop();
+     }
+   
+     blendMode(LIGHTEST);
+     for (let i = 0; i < items.length; i++) {
+       let item = items[i];
+       push();
+       translate(item.x, item.y);
+       rotate(item.angle);
+       tint(255, 255, 255, item.whiteLayerOpacity);
+       image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
+       pop();
+     }
+   
+     blendMode(BLEND);
+     noTint();
+   }
+   
+   /* =========================================================
+      FEEDBACK: small collect particles + end-game confetti
+      ========================================================= */
+   
+   class CollectParticle {
+     constructor(x, y) {
+       this.x = x;
+       this.y = y;
+       this.life = 255;
+       this.vy = -0.9;
+       this.vx = random(-0.3, 0.3);
+       this.scale = random(0.9, 1.3);
+     }
+     update() {
+       this.x += this.vx;
+       this.y += this.vy;
+       this.life -= 6;
+     }
+     draw() {
+       noStroke();
+       fill(255, 255, 255, this.life);
+       textSize(20 * this.scale);
+       text("+1", this.x, this.y);
+     }
+     isDead() {
+       return this.life <= 0;
+     }
+   }
+   
+   class SparklePiece {
+     constructor(x, y) {
+       this.x = x;
+       this.y = y;
+       let a = random(TWO_PI);
+       let sp = random(1.2, 3.2);
+       this.vx = cos(a) * sp;
+       this.vy = sin(a) * sp;
+       this.life = 255;
+       this.size = random(2, 5);
+       this.col = random([
+         [255, 255, 255],
+         [120, 220, 255],
+         [180, 255, 230],
+       ]);
+     }
+     update() {
+       this.x += this.vx;
+       this.y += this.vy;
+       this.vy += 0.04;
+       this.life -= 8;
+     }
+     draw() {
+       noStroke();
+       fill(this.col[0], this.col[1], this.col[2], this.life);
+       ellipse(this.x, this.y, this.size);
+     }
+     isDead() {
+       return this.life <= 0;
+     }
+   }
+   
+   function spawnCollectFeedback(x, y) {
+     particles.push(new CollectParticle(x, y));
+     for (let i = 0; i < 8; i++) particles.push(new SparklePiece(x, y));
+   }
+   
+   function updateAndDrawParticles() {
+     if (!particles.length) return;
+   
+     push();
+     textFont(fontBold);
+     textAlign(CENTER, CENTER);
+     for (let i = particles.length - 1; i >= 0; i--) {
+       particles[i].update();
+       particles[i].draw();
+       if (particles[i].isDead()) removeAtFast(particles, i);
+     }
+     pop();
+   }
+   
+   class ConfettiPiece {
+     constructor() {
+       this.x = random(0, posterW);
+       this.y = random(-200, -20);
+       this.vy = random(2, 5);
+       this.vx = random(-1, 1);
+       this.size = random(6, 12);
+       this.rot = random(TWO_PI);
+       this.rotSpeed = random(-0.1, 0.1);
+       this.col = random([
+         [255, 195, 0],
+         [0, 200, 255],
+         [255, 90, 130],
+         [120, 255, 170],
+         [255, 255, 255],
+       ]);
+     }
+     update() {
+       this.y += this.vy;
+       this.x += this.vx;
+       this.rot += this.rotSpeed;
+     }
+     draw() {
+       noStroke();
+       fill(this.col[0], this.col[1], this.col[2]);
+       rect(0, 0, this.size, this.size * 0.5);
+     }
+   }
+   
+   function updateAndDrawConfetti() {
+     if (!confetti.length) return;
+   
+     push();
+     rectMode(CENTER);
+     for (let i = confetti.length - 1; i >= 0; i--) {
+       confetti[i].update();
+       push();
+       translate(confetti[i].x, confetti[i].y);
+       rotate(confetti[i].rot);
+       confetti[i].draw();
+       pop();
+       if (confetti[i].y > posterH + 40) removeAtFast(confetti, i);
+     }
+     rectMode(CORNER);
+     pop();
+   }
+   
+   function spawnConfettiBurst() {
+     confetti = [];
+     for (let i = 0; i < 120; i++) confetti.push(new ConfettiPiece());
+   }
+   
+   /* =========================================================
+      POSTER RESET
+      ========================================================= */
+   
+   function resetPoster(index) {
+     let p = posters[index];
+     if (!p.plastic) return;
+   
+     p.items = [];
+     p.collectedCount = 0;
+     p.timeLeft = 30;
+     p.lastSecondTime = millis();
+     p.showPopup = false;
+     p.showEndPopup = false;
+     p.confettiFired = false;
+     p._cachedCountValue = -1;
+   
+     if (p.name === "Seal" || p.name === "Whale") {
+       for (let i = 0; i < 36; i++) p.items.push(new FloatingPlastic(p, "large"));
+       for (let i = 0; i < 48; i++) p.items.push(new FloatingPlastic(p, "medium"));
+       for (let i = 0; i < 56; i++) p.items.push(new FloatingPlastic(p, "small"));
+     } else if (p.itemType === "bag") {
+       for (let i = 0; i < 24; i++) p.items.push(new FloatingPlastic(p, "large"));
+       for (let i = 0; i < 32; i++) p.items.push(new FloatingPlastic(p, "medium"));
+       for (let i = 0; i < 40; i++) p.items.push(new FloatingPlastic(p, "small"));
+     } else if (p.itemType === "straw") {
+       for (let i = 0; i < 26; i++) p.items.push(new FloatingPlastic(p, "large"));
+       for (let i = 0; i < 36; i++) p.items.push(new FloatingPlastic(p, "medium"));
+       for (let i = 0; i < 44; i++) p.items.push(new FloatingPlastic(p, "small"));
+     } else {
+       for (let i = 0; i < 24; i++) p.items.push(new FloatingPlastic(p, "large"));
+       for (let i = 0; i < 34; i++) p.items.push(new FloatingPlastic(p, "medium"));
+       for (let i = 0; i < 42; i++) p.items.push(new FloatingPlastic(p, "small"));
+     }
+   }
+   
+   /* =========================================================
+      MAIN DRAW
+      ========================================================= */
+   
+   function draw() {
+     touchMoveHandledThisFrame = false;
+     ensureVisualCaches();
+     background(8, 18, 26);
+   
+     if (appState === 'home') {
+       drawHomeScreen();
+     } else {
+       drawActivePoster();
+     }
+   
+     if (presentationMode) {
+       drawPresentationFrame();
+     }
+   
+     drawShareToast();
+   }
+   
+   /* =========================================================
+      HOME SCREEN — swipeable poster carousel + dots
+      ========================================================= */
+   
+   function getHomeCardGeometry() {
+     let cardW = min(width * 0.68, 300);
+     let cardH = cardW * (posterH / posterW);
+     let cx = width / 2;
+     let cy = height * 0.52;
+     let scale = cardW / posterW;
+     return { cardW, cardH, cx, cy, scale };
+   }
+   
+   function drawHomeScreen() {
+     if (homeGradientCache) {
+       image(homeGradientCache, 0, 0);
+     }
+   
+     // ease the carousel slide
+     if (isDragging) {
+       homeSlideOffset = lerp(homeSlideOffset, homeSlideTarget, 1);
+     } else if (abs(homeSlideOffset - homeSlideTarget) < 0.5) {
+       homeSlideOffset = homeSlideTarget;
+     } else {
+       homeSlideOffset = lerp(homeSlideOffset, homeSlideTarget, 0.18);
+     }
+   
+     push();
+     textAlign(CENTER, TOP);
+     textFont(fontBold);
+     let headSize = constrain(width * 0.075, 20, 34);
+     textSize(headSize);
+     fill(255);
+     text("EVERY PIECE\nYOU COLLECT\nSAVES A LIFE", width / 2, height * 0.05);
+     pop();
+   
+     drawHomeCarousel();
+     drawHomeDots();
+   
+     push();
+     textAlign(CENTER, CENTER);
+     textFont(fontRegular);
+     textSize(13);
+     let pulse = 150 + 80 * sin(frameCount * 0.06);
+     fill(255, pulse);
+     text("Swipe to browse  •  Tap to open", width / 2, height * 0.93);
+     pop();
+   }
+   
+   function drawHomeCarousel() {
+     let { cardW, scale } = getHomeCardGeometry();
+     let gap = cardW * 1.08;
+   
+     // draw neighbors first (back), center last (front)
+     drawHomeCard(homeIndex - 1, homeSlideOffset * scale - gap, false);
+     drawHomeCard(homeIndex + 1, homeSlideOffset * scale + gap, false);
+     drawHomeCard(homeIndex, homeSlideOffset * scale, true);
+   }
+   
+   function drawHomeCard(index, offsetXpx, isCenter) {
+     if (index < 0 || index >= posters.length) return;
+     let p = posters[index];
+     if (!p) return;
+   
+     let { cardW, cardH, cx, cy } = getHomeCardGeometry();
+   
+     push();
+     translate(cx + offsetXpx, cy);
+     let s = isCenter ? 1 : 0.86;
+     scale(s);
+   
+     drawingContext.save();
+     drawingContext.beginPath();
+     if (drawingContext.roundRect) {
+       drawingContext.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 22);
+     } else {
+       drawingContext.rect(-cardW / 2, -cardH / 2, cardW, cardH);
+     }
+     drawingContext.clip();
+   
+     push();
+     translate(-cardW / 2, -cardH / 2);
+     let sc = cardW / posterW;
+     scale(sc);
+     if (p._staticLayer) {
+       image(p._staticLayer, 0, 0);
+     } else {
+       drawPosterBase(p);
+       drawPosterText(p);
+     }
+     pop();
+   
+     if (!isCenter) {
+       fill(8, 20, 30, 140);
+       noStroke();
+       rect(-cardW / 2, -cardH / 2, cardW, cardH);
+     }
+   
+     drawingContext.restore();
+   
+     noFill();
+     stroke(255, isCenter ? 220 : 90);
+     strokeWeight(isCenter ? 2.5 : 1.5);
+     rect(-cardW / 2, -cardH / 2, cardW, cardH, 22);
+   
+     if (isCenter) {
+       fill(255, 255, 255, 230);
+       noStroke();
+       rectMode(CENTER);
+       rect(0, cardH / 2 - 26, 130, 30, 15);
+       rectMode(CORNER);
+   
+       fill(10, 40, 60);
+       textFont(fontBold);
+       textAlign(CENTER, CENTER);
+       textSize(13);
+       text("TAP TO OPEN", 0, cardH / 2 - 25);
+     }
+   
+     pop();
+   }
+   
+   function drawHomeDots() {
+     let n = posters.length;
+     let spacing = 22;
+     let totalW = (n - 1) * spacing;
+     let startX = width / 2 - totalW / 2;
+     let { cardH, cy } = getHomeCardGeometry();
+     let y = cy + cardH / 2 + 38;
+     if (y > height - 40) y = height - 40;
+   
+     push();
+     noStroke();
+     for (let i = 0; i < n; i++) {
+       let x = startX + i * spacing;
+       if (i === homeIndex) {
+         fill(255);
+         ellipse(x, y, 11, 11);
+       } else {
+         fill(255, 110);
+         ellipse(x, y, 7, 7);
+       }
+     }
+     pop();
+   }
+   
+   function handleHomeTap(screenX, screenY) {
+     let { cardW, cardH, cx, cy } = getHomeCardGeometry();
+     if (screenX > cx - cardW / 2 && screenX < cx + cardW / 2 &&
+         screenY > cy - cardH / 2 && screenY < cy + cardH / 2) {
+       appState = 'poster';
+       slideOffset = 0;
+       slideTarget = 0;
+       setActivePoster(homeIndex);
+       setAppCursor();
+     }
+   }
+   
+   /* =========================================================
+      ACTIVE POSTER VIEW (with swipe navigation)
+      ========================================================= */
+   
+   function drawActivePoster() {
+     if (isDragging) {
+       slideOffset = lerp(slideOffset, slideTarget, 1);
+     } else if (abs(slideOffset - slideTarget) < 0.5) {
+       slideOffset = slideTarget;
+     } else {
+       slideOffset = lerp(slideOffset, slideTarget, 0.18);
+     }
+   
+     fill(0, 0, 0, 230);
+     noStroke();
+     rect(0, 0, width, height);
+   
+     drawSinglePoster(activePoster, slideOffset);
+   
+     let neighborGap = posterW * activeScale * 1.06;
+     if (slideOffset > 2 && activePoster > 0) {
+       ensurePosterItems(activePoster - 1);
+       drawSinglePoster(activePoster - 1, slideOffset - neighborGap / activeScale);
+     }
+     if (slideOffset < -2 && activePoster < posters.length - 1) {
+       ensurePosterItems(activePoster + 1);
+       drawSinglePoster(activePoster + 1, slideOffset + neighborGap / activeScale);
+     }
+   
+     drawDotsIndicator();
+   }
+   
+   function drawSinglePoster(index, offsetXInPosterSpace) {
+     if (index < 0 || index >= posters.length) return;
+     let p = posters[index];
+     let isActive = index === activePoster;
+     let shouldUpdateItems = isActive && !p.showPopup && !p.showEndPopup && p.items;
+   
+     push();
+     translate(activeX + offsetXInPosterSpace * activeScale, activeY);
+     scale(activeScale);
+   
+     drawingContext.save();
+     drawingContext.beginPath();
+     drawingContext.rect(0, 0, posterW, posterH);
+     drawingContext.clip();
+   
+     if (p._staticLayer) {
+       image(p._staticLayer, 0, 0);
+     } else {
+       drawPosterBase(p);
+       drawPosterText(p);
+     }
+   
+     if (isActive && !p.showPopup && !p.showEndPopup) {
+       updateTimer(p);
+     }
+   
+     if (p.items) {
+       if (shouldUpdateItems) {
+         for (let i = 0; i < p.items.length; i++) {
+           p.items[i].update();
+         }
+       }
+       drawFloatingPlastics(p.items, p);
+     }
+   
+     drawUnifiedCounterAndTimer(p);
+     drawLearnMoreButton();
+   
+     if (isActive) {
+       updateAndDrawParticles();
+     }
+   
+     if (p.showPopup) drawPopup(p);
+   
+     if (p.showEndPopup) {
+       if (p.collectedCount > 0 && !p.confettiFired) {
+         spawnConfettiBurst();
+         p.confettiFired = true;
+       }
+       if (p.collectedCount > 0) {
+         updateAndDrawConfetti();
+       }
+       drawEndPopup(p);
+     }
+   
+     drawingContext.restore();
+   
+     noFill();
+     stroke(255, 190);
+     strokeWeight(2);
+     rect(0, 0, posterW, posterH);
+   
+     pop();
+   }
+   
+   function drawDotsIndicator() {
+     let n = posters.length;
+     let spacing = 22;
+     let totalW = (n - 1) * spacing;
+     let startX = width / 2 - totalW / 2;
+     let y = activeY + posterH * activeScale + 26;
+     if (y > height - 16) y = height - 16;
+   
+     push();
+     noStroke();
+     for (let i = 0; i < n; i++) {
+       let x = startX + i * spacing;
+       if (i === activePoster) {
+         fill(255);
+         ellipse(x, y, 11, 11);
+       } else {
+         fill(255, 110);
+         ellipse(x, y, 7, 7);
+       }
+     }
+     pop();
+   }
+   
+   /* =========================================================
+      POSTER BASE / TEXT (layout: text left, HUD right)
+      ========================================================= */
+   
+   function drawPosterBaseTo(ctx, p) {
+     ctx.push();
+     ctx.fill(50);
+     ctx.noStroke();
+     ctx.rect(0, 0, posterW, posterH);
+   
+     ctx.imageMode(CORNER);
+     ctx.image(p.bg, p.bgX, p.bgY);
+   
+     ctx.fill(0, 0, 0, p.dark);
+     ctx.noStroke();
+     ctx.rect(0, 0, posterW, posterH);
+     ctx.pop();
+   }
+   
+   function drawPosterBase(p) {
+     push();
+     fill(50);
+     noStroke();
+     rect(0, 0, posterW, posterH);
+   
+     imageMode(CORNER);
+     image(p.bg, p.bgX, p.bgY);
+   
+     fill(0, 0, 0, p.dark);
+     noStroke();
+     rect(0, 0, posterW, posterH);
+     pop();
+   }
+   
+   function drawPosterTextTo(ctx, p) {
+     ctx.push();
+     ctx.textFont(fontBold);
+     ctx.textSize(p.title1Size);
+     ctx.fill(255);
+     ctx.text(p.title1, 11, p.title1Y + p.title1Offset);
+   
+     ctx.textSize(p.title2Size);
+     ctx.text(p.title2, 11, p.title2Y + p.title2Offset);
+   
+     ctx.textFont(fontRegular);
+     ctx.textSize(24);
+     ctx.text("USE LESS.", 20, 760);
+     ctx.text("THROW BETTER.", 20, 787);
+     ctx.text("ACT NOW.", 20, 814);
+   
+     ctx.textSize(18);
+     for (let i = 0; i < p.sideText.length; i++) {
+       ctx.text(p.sideText[i], 24, 50 + i * 22);
+     }
+   
+     ctx.textSize(20);
+     ctx.text("THINK BEFORE YOU THROW", 20, 712);
+     ctx.pop();
+   }
+   
+   function drawPosterText(p) {
+     push();
+     textFont(fontBold);
+     textSize(p.title1Size);
+     fill(255);
+     text(p.title1, 11, p.title1Y + p.title1Offset);
+   
+     textSize(p.title2Size);
+     text(p.title2, 11, p.title2Y + p.title2Offset);
+   
+     textFont(fontRegular);
+     textSize(24);
+     text("USE LESS.", 20, 760);
+     text("THROW BETTER.", 20, 787);
+     text("ACT NOW.", 20, 814);
+   
+     textSize(18);
+     for (let i = 0; i < p.sideText.length; i++) {
+       text(p.sideText[i], 24, 50 + i * 22);
+     }
+   
+     textSize(20);
+     text("THINK BEFORE YOU THROW", 20, 712);
+     pop();
+   }
+   
+   /* =========================================================
+      COUNTER + TIMER — number, pcs, and clock icon + seconds
+      (title text removed)
+      ========================================================= */
+   
+   function drawUnifiedCounterAndTimer(p) {
+     push();
+   
+     let hudW = 150;
+     let hudH = 64;
+     let hudX = posterW - hudW - 18;
+     let hudY = 18;
+   
+     fill(10, 60, 90, 215);
+     stroke(255, 255, 255, 170);
+     strokeWeight(1.5);
+     rect(hudX, hudY, hudW, hudH, 16);
+   
+     fill(255, 255, 255, 18);
+     noStroke();
+     rect(hudX, hudY, hudW, hudH / 2, 16, 16, 0, 0);
+   
+     fill(255);
+     textFont(fontBold);
+     textAlign(LEFT, CENTER);
+     textSize(30);
+     text(p.collectedCount, hudX + 14, hudY + 26);
+   
+     if (p.collectedCount !== p._cachedCountValue) {
+       textFont(fontBold);
+       textSize(30);
+       p._cachedCountWidth = textWidth(String(p.collectedCount));
+       p._cachedCountValue = p.collectedCount;
+     }
+   
+     textFont(fontRegular);
+     textSize(13);
+     fill(190, 230, 255);
+     text("pcs", hudX + 22 + p._cachedCountWidth, hudY + 28);
+   
+     stroke(255, 90);
+     strokeWeight(1);
+     line(hudX + 14, hudY + 42, hudX + hudW - 14, hudY + 42);
+   
+     noStroke();
+     fill(255, 210);
+     textFont(fontRegular);
+     textAlign(LEFT, CENTER);
+     textSize(13);
+     text("⏱ " + p.timeLeft + "s", hudX + 14, hudY + 53);
+   
+     pop();
+   }
+   
+   function updateTimer(p) {
+     if (millis() - p.lastSecondTime >= 1000) {
+       p.timeLeft--;
+       p.lastSecondTime = millis();
+   
+       if (p.timeLeft <= 0) {
+         p.timeLeft = 0;
+         p.showEndPopup = true;
+       }
+     }
+   }
+   
+   /* =========================================================
+      LEARN MORE — chip/button
+      ========================================================= */
+   
+   function drawLearnMoreButton() {
+     push();
+   
+     let hovering = false;
+   
+     fill(255, 255, 255, hovering ? 235 : 210);
+     stroke(255);
+     strokeWeight(1.2);
+     rect(btnX, btnY, btnW, btnH, 22);
+   
+     noStroke();
+     fill(10, 40, 60);
+     textFont(fontBold);
+     textAlign(CENTER, CENTER);
+     textSize(14);
+     text("ℹ  Learn more", btnX + btnW / 2, btnY + btnH / 2 + 1);
+   
+     pop();
+   }
+   
+   function isMouseOverButton(mx, my) {
+     return mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH;
+   }
+   
+   /* =========================================================
+      LEARN-MORE POPUP (unchanged visuals, same logic)
+      ========================================================= */
+   
+   function drawPopup(p) {
+     push();
+   
+     fill(0, 0, 0, 120);
+     noStroke();
+     rect(0, 0, posterW, posterH);
+   
+     let popX = 50;
+     let popY = 200;
+     let popW = 550;
+     let popH = 500;
+   
+     fill(10, 60, 90, 210);
+     stroke(255, 255, 255, 180);
+     strokeWeight(2);
+     rect(popX, popY, popW, popH, 15);
+   
+     fill(255, 255, 255, 15);
+     noStroke();
+     rect(popX, popY, popW, popH / 2, 15, 15, 0, 0);
+   
+     fill(255);
+     noStroke();
+     textFont(fontRegular);
+     textSize(24);
+     textAlign(LEFT, BASELINE);
+     text("X", popX + popW - 30, popY + 35);
+   
+     textFont(fontBold);
+     textSize(22);
+     textAlign(LEFT, TOP);
+     text("THE OCEAN IS NOT A TRASH CAN.", popX + 30, popY + 60, popW - 60);
+   
+     stroke(255);
+     strokeWeight(1.5);
+     line(popX + 30, popY + 105, popX + popW - 30, popY + 105);
+     noStroke();
+   
+     textFont(fontRegular);
+     textSize(16);
+     fill(255);
+     textAlign(LEFT, TOP);
+     textWrap(WORD);
+     text(p.popupText, popX + 30, popY + 150, popW - 60);
+   
+     pop();
+   }
+   
+   /* =========================================================
+      END POPUP — persuasive empty state + share buttons
+      ========================================================= */
+   
+   function drawEndPopup(p) {
+     push();
+   
+     fill(0, 0, 0, 170);
+     noStroke();
+     rect(0, 0, posterW, posterH);
+   
+     let popX = 45;
+     let popY = 230;
+     let popW = 560;
+     let popH = 500;
+   
+     fill(10, 60, 90, 235);
+     stroke(255, 255, 255, 200);
+     strokeWeight(2);
+     rect(popX, popY, popW, popH, 18);
+   
+     fill(255, 255, 255, 18);
+     noStroke();
+     rect(popX, popY, popW, popH / 2, 18, 18, 0, 0);
+   
+     fill(255);
+     textFont(fontRegular);
+     textSize(28);
+     textAlign(CENTER, CENTER);
+     text("X", popX + popW - 35, popY + 35);
+   
+     textAlign(CENTER, TOP);
+   
+     if (p.collectedCount > 0) {
+       textFont(fontBold);
+       textSize(32);
+       fill(255);
+       text("Mission accomplished!", popX + popW / 2, popY + 80, popW - 60);
+   
+       textFont(fontRegular);
+       textSize(19);
+       textWrap(WORD);
+       text(
+         "The " + p.collectedCount + " plastic units you collected equal $" +
+           p.collectedCount + " donated to protecting marine life and cleaning our oceans.",
+         popX + 55, popY + 155, popW - 110
+       );
+     } else {
+       textFont(fontBold);
+       textSize(28);
+       textLeading(36);
+       fill(255);
+       text("The ocean needed you.", popX + 40, popY + 75, popW - 80, 90);
+   
+       textFont(fontRegular);
+       textSize(19);
+       textLeading(28);
+       textWrap(WORD);
+       text(
+         "Right now, real animals are choking, starving and dying from plastic just like what you saw here. " +
+         "You collected nothing this time — but it's not too late to make a difference.",
+         popX + 55, popY + 150, popW - 110
+       );
+     }
+   
+     let btnAW = 220, btnAH = 50;
+     let btnAX = popX + popW / 2 - btnAW / 2;
+     let btnAY = popY + popH - 170;
+   
+     fill(255);
+     noStroke();
+     rect(btnAX, btnAY, btnAW, btnAH, 25);
+     fill(10, 60, 90);
+     textFont(fontBold);
+     textSize(17);
+     textAlign(CENTER, CENTER);
+     text(p.collectedCount > 0 ? "🔁 Play again" : "🔁 Try again", btnAX + btnAW / 2, btnAY + btnAH / 2 + 1);
+   
+     p._tryAgainBox = { x: btnAX, y: btnAY, w: btnAW, h: btnAH };
+   
+     let btnSW = 220, btnSH = 50;
+     let btnSX = popX + popW / 2 - btnSW / 2;
+     let btnSY = btnAY + btnAH + 16;
+   
+     fill(40, 170, 220);
+     noStroke();
+     rect(btnSX, btnSY, btnSW, btnSH, 25);
+     fill(255);
+     textFont(fontBold);
+     textSize(17);
+     textAlign(CENTER, CENTER);
+     text("📤 Share with friends", btnSX + btnSW / 2, btnSY + btnSH / 2 + 1);
+   
+     p._shareBox = { x: btnSX, y: btnSY, w: btnSW, h: btnSH };
+   
+     pop();
+   }
+   
+   function isMouseOverEndCloseBox(mx, my) {
+     return mx >= 560 && mx <= 605 && my >= 280 && my <= 325;
+   }
+   
+   function isMouseOverCloseBox(mx, my) {
+     return mx >= 550 && mx <= 590 && my >= 210 && my <= 250;
+   }
+   
+   /* =========================================================
+      SHARE FEATURE
+      ========================================================= */
+   
+   function buildShareText(p) {
+     return "I collected " + p.collectedCount + " pieces of plastic and donated $" +
+       p.collectedCount + " to ocean conservation. Can you beat me?";
+   }
+   
+   function doShare(p) {
+     let text = buildShareText(p);
+   
+     if (navigator.share) {
+       navigator.share({ title: "Ocean Plastic Challenge", text: text }).catch(() => {});
+     } else if (navigator.clipboard && navigator.clipboard.writeText) {
+       navigator.clipboard.writeText(text).then(() => {
+         showShareToast("Copied!");
+       }).catch(() => {
+         showShareToast(text);
+       });
+     } else {
+       showShareToast(text);
+     }
+   }
+   
+   function showShareToast(msg) {
+     shareMsg = msg;
+     shareMsgTimer = 150;
+   }
+   
+   function drawShareToast() {
+     if (shareMsgTimer <= 0) return;
+     shareMsgTimer--;
+   
+     push();
+     let alpha = min(255, shareMsgTimer * 6);
+     let toastW = min(width * 0.85, 360);
+     let toastX = width / 2 - toastW / 2;
+     let toastY = height - 90;
+   
+     fill(20, 20, 20, alpha * 0.9);
+     noStroke();
+     rect(toastX, toastY, toastW, 50, 14);
+   
+     fill(255, alpha);
+     textFont(fontRegular);
+     textSize(13);
+     textAlign(CENTER, CENTER);
+     textWrap(WORD);
+     text(shareMsg, toastX + toastW / 2, toastY + 25, toastW - 24);
+     pop();
+   }
+   
+   /* =========================================================
+      COLLECTING PLASTIC
+      ========================================================= */
+   
+   function collectPlasticAt(p, mx, my) {
+     if (p.showEndPopup || !p.items) return;
+   
+     for (let i = p.items.length - 1; i >= 0; i--) {
+       if (p.items[i].isClicked(mx, my)) {
+         let item = p.items[i];
+         p.items.splice(i, 1);
+         p.collectedCount++;
+         p._cachedCountValue = -1;
+         spawnCollectFeedback(item.x, item.y);
+         return;
+       }
+     }
+   }
+   
+   /* =========================================================
+      PRESENTATION / MOCKUP MODE
+      ========================================================= */
+   
+   function drawPresentationFrame() {
+     push();
+     noFill();
+     stroke(0);
+     strokeWeight(18);
+     rect(9, 9, width - 18, height - 18, 46);
+   
+     stroke(60);
+     strokeWeight(3);
+     rect(20, 20, width - 40, height - 40, 36);
+   
+     noStroke();
+     fill(0);
+     rectMode(CENTER);
+     rect(width / 2, 30, 90, 18, 10);
+     rectMode(CORNER);
+   
+     fakeFingerT += 0.02;
+     let fx = width / 2 + sin(fakeFingerT) * width * 0.18;
+     let fy = height * 0.7 + cos(fakeFingerT * 1.3) * height * 0.06;
+     noStroke();
+     fill(255, 200, 120, 90);
+     ellipse(fx, fy, 46, 46);
+     fill(255, 200, 120, 160);
+     ellipse(fx, fy, 18, 18);
+   
+     pop();
+   }
+   
+   /* =========================================================
+      INPUT HANDLING (mouse + touch, with swipe)
+      ========================================================= */
+   
+   function mousePressed() {
+     dragDeltaForTap = 0;
+   
+     if (appState === 'home') {
+       dragStartX = mouseX;
+       dragStartY = mouseY;
+       dragStartOffset = homeSlideOffset;
+       isDragging = false;
+       swipeLocked = false;
+       return;
+     }
+   
+     dragStartX = mouseX;
+     dragStartY = mouseY;
+     dragStartOffset = slideOffset;
+     isDragging = false;
+     swipeLocked = false;
+   }
+   
+   function mouseDragged() {
+     if (appState === 'home') {
+       if (swipeLocked) return;
+   
+       let dx = mouseX - dragStartX;
+       let dy = mouseY - dragStartY;
+   
+       if (!isDragging) {
+         if (abs(dx) > 14 && abs(dx) > abs(dy) * 1.4) {
+           isDragging = true;
+         } else if (abs(dy) > 14) {
+           swipeLocked = true;
+           return;
+         } else {
+           return;
+         }
+       }
+   
+       dragDeltaForTap = dx;
+       let { scale } = getHomeCardGeometry();
+       homeSlideOffset = dragStartOffset + dx / scale;
+       return;
+     }
+   
+     if (appState !== 'poster') return;
+     if (swipeLocked) return;
+   
+     let dx = mouseX - dragStartX;
+     let dy = mouseY - dragStartY;
+   
+     if (!isDragging) {
+       if (abs(dx) > 14 && abs(dx) > abs(dy) * 1.4) {
+         isDragging = true;
+       } else if (abs(dy) > 14) {
+         swipeLocked = true;
+         return;
+       } else {
+         return;
+       }
+     }
+   
+     dragDeltaForTap = dx;
+     slideOffset = dragStartOffset + dx / activeScale;
+   }
+   
+   function mouseReleased() {
+     if (appState === 'home') {
+       if (isDragging) {
+         isDragging = false;
+   
+         let { cardW, scale } = getHomeCardGeometry();
+         let gap = cardW * 1.08;
+         let threshold = 60;
+   
+         if (dragDeltaForTap > threshold && homeIndex > 0) {
+           homeIndex--;
+           homeSlideOffset = -(gap / scale);
+           homeSlideTarget = 0;
+         } else if (dragDeltaForTap < -threshold && homeIndex < posters.length - 1) {
+           homeIndex++;
+           homeSlideOffset = (gap / scale);
+           homeSlideTarget = 0;
+         } else {
+           homeSlideTarget = 0;
+         }
+       } else {
+         handleHomeTap(mouseX, mouseY);
+       }
+   
+       dragDeltaForTap = 0;
+       swipeLocked = false;
+       return;
+     }
+   
+     if (appState !== 'poster') return;
+   
+     if (isDragging) {
+       isDragging = false;
+   
+       let threshold = 60;
+       if (dragDeltaForTap > threshold && activePoster > 0) {
+         setActivePoster(activePoster - 1);
+         slideOffset = -(posterW * 1.06);
+         slideTarget = 0;
+       } else if (dragDeltaForTap < -threshold && activePoster < posters.length - 1) {
+         setActivePoster(activePoster + 1);
+         slideOffset = (posterW * 1.06);
+         slideTarget = 0;
+       } else {
+         slideTarget = 0;
+       }
+     } else {
+       handlePosterTap(mouseX, mouseY);
+     }
+   
+     dragDeltaForTap = 0;
+     swipeLocked = false;
+   }
+   
+   function handlePosterTap(screenX, screenY) {
+     let p = posters[activePoster];
+   
+     let mx = (screenX - activeX) / activeScale - slideOffset;
+     let my = (screenY - activeY) / activeScale;
+   
+     if (mx < 0 || mx > posterW || my < 0 || my > posterH) return;
+   
+     if (p.showEndPopup) {
+       if (p._tryAgainBox && pointInBox(mx, my, p._tryAgainBox)) {
+         resetPoster(activePoster);
+         return;
+       }
+       if (p._shareBox && pointInBox(mx, my, p._shareBox)) {
+         doShare(p);
+         return;
+       }
+       if (isMouseOverEndCloseBox(mx, my)) {
+         resetPoster(activePoster);
+       }
+       return;
+     }
+   
+     if (p.showPopup) {
+       if (isMouseOverCloseBox(mx, my) || mx < 50 || mx > 600 || my < 200 || my > 700) {
+         p.showPopup = false;
+         p.lastSecondTime = millis();
+       }
+       return;
+     }
+   
+     if (isMouseOverButton(mx, my)) {
+       p.showPopup = true;
+       return;
+     }
+   
+     collectPlasticAt(p, mx, my);
+   }
+   
+   function pointInBox(x, y, box) {
+     return x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
+   }
+   
+   function touchStarted() {
+     mousePressed();
+     return false;
+   }
+   
+   function touchMoved() {
+     if (touchMoveHandledThisFrame) return false;
+     touchMoveHandledThisFrame = true;
+     mouseDragged();
+     return false;
+   }
+   
+   function touchEnded() {
+     mouseReleased();
+     return false;
+   }
+   
+   function keyPressed() {
+     if (key === 'm' || key === 'M') {
+       presentationMode = !presentationMode;
+     }
+     if (key === 'Escape') {
+       goToHome();
+     }
+   }
