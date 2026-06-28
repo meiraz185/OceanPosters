@@ -51,6 +51,7 @@ let shareMsgTimer = 0;
 // performance caches
 let homeGradientCache = null;
 let deckCache = null;
+let visualCachesReady = false;
 let touchMoveHandledThisFrame = false;
 
 function preload() {
@@ -61,8 +62,7 @@ function preload() {
     {
       name: "Seal",
       bg: loadImage("seal.png"),
-      plasticPath: "Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png",
-      plastic: null,
+      plastic: loadImage("Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png"),
       bgX: -100,
       bgY: -300,
       dark: 70,
@@ -93,8 +93,7 @@ function preload() {
     {
       name: "Whale",
       bg: loadImage("whale.png"),
-      plasticPath: "Gemini_Generated_Image_2rijc92rijc92rij.png",
-      plastic: null,
+      plastic: loadImage("Gemini_Generated_Image_2rijc92rijc92rij.png"),
       bgX: -330,
       bgY: -90,
       dark: 70,
@@ -125,8 +124,7 @@ function preload() {
     {
       name: "Sea Turtle",
       bg: loadImage("9B31B070-C374-4143-858F-F08E009188A7 (1).PNG"),
-      plasticPath: "bag.png",
-      plastic: null,
+      plastic: loadImage("bag.png"),
       bgX: -100,
       bgY: -300,
       dark: 70,
@@ -157,8 +155,7 @@ function preload() {
     {
       name: "Fish",
       bg: loadImage("nemo.png"),
-      plasticPath: "plate1.png",
-      plastic: null,
+      plastic: loadImage("plate1.png"),
       bgX: -140,
       bgY: -370,
       dark: 45,
@@ -189,8 +186,7 @@ function preload() {
     {
       name: "Dolphin",
       bg: loadImage("783D18C3-2A77-40C3-B7A0-8D0218BA5D65.PNG"),
-      plasticPath: "straw.png",
-      plastic: null,
+      plastic: loadImage("straw.png"),
       bgX: -330,
       bgY: -400,
       dark: 45,
@@ -249,40 +245,19 @@ function initPosterState(index) {
   p.showPopup = false;
   p.showEndPopup = false;
   p.confettiFired = false;
-  p.plasticLoaded = false;
-  p.plastic = null;
-  p._plasticLoading = false;
   p._staticLayer = null;
   p._cachedCountValue = -1;
   p._cachedCountWidth = 0;
 }
 
-function ensurePosterReady(index) {
+function ensurePosterItems(index) {
   let p = posters[index];
-  if (p.plasticLoaded && p.items) return;
-
-  if (!p.plasticLoaded && !p._plasticLoading) {
-    p._plasticLoading = true;
-    loadImage(
-      p.plasticPath,
-      (img) => {
-        p.plastic = img;
-        p.plasticLoaded = true;
-        p._plasticLoading = false;
-        if (!p.items) resetPoster(index);
-      },
-      () => {
-        p._plasticLoading = false;
-      }
-    );
-  } else if (p.plasticLoaded && !p.items) {
-    resetPoster(index);
-  }
+  if (p.plastic && !p.items) resetPoster(index);
 }
 
 function setActivePoster(index) {
   activePoster = index;
-  ensurePosterReady(index);
+  ensurePosterItems(index);
 }
 
 function goToHome() {
@@ -301,21 +276,28 @@ function setup() {
 
   for (let i = 0; i < posters.length; i++) {
     initPosterState(i);
-    rebuildPosterStaticLayer(i);
   }
 
-  rebuildHomeCaches();
+  visualCachesReady = false;
   setAppCursor();
+}
+
+function ensureVisualCaches() {
+  if (visualCachesReady) return;
+
+  for (let i = 0; i < posters.length; i++) {
+    rebuildPosterStaticLayer(i);
+  }
+  rebuildHomeCaches();
+  visualCachesReady = true;
 }
 
 function windowResized() {
   applyPixelDensity();
   resizeCanvas(windowWidth, windowHeight);
   computeActiveTransform();
-  rebuildHomeCaches();
-  for (let i = 0; i < posters.length; i++) {
-    rebuildPosterStaticLayer(i);
-  }
+  visualCachesReady = false;
+  ensureVisualCaches();
 }
 
 function rebuildHomeCaches() {
@@ -738,6 +720,7 @@ function resetPoster(index) {
 
 function draw() {
   touchMoveHandledThisFrame = false;
+  ensureVisualCaches();
   background(8, 18, 26);
 
   if (appState === 'home') {
@@ -809,8 +792,6 @@ function isTapOnDeck(mx, my) {
    ========================================================= */
 
 function drawActivePoster() {
-  ensurePosterReady(activePoster);
-
   if (isDragging) {
     slideOffset = lerp(slideOffset, slideTarget, 1);
   } else if (abs(slideOffset - slideTarget) < 0.5) {
@@ -827,11 +808,11 @@ function drawActivePoster() {
 
   let neighborGap = posterW * activeScale * 1.06;
   if (slideOffset > 2 && activePoster > 0) {
-    ensurePosterReady(activePoster - 1);
+    ensurePosterItems(activePoster - 1);
     drawSinglePoster(activePoster - 1, slideOffset - neighborGap / activeScale);
   }
   if (slideOffset < -2 && activePoster < posters.length - 1) {
-    ensurePosterReady(activePoster + 1);
+    ensurePosterItems(activePoster + 1);
     drawSinglePoster(activePoster + 1, slideOffset + neighborGap / activeScale);
   }
 
