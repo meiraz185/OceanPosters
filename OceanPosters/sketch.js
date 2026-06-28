@@ -48,6 +48,11 @@ let confetti = [];
 let shareMsg = '';
 let shareMsgTimer = 0;
 
+// performance caches
+let homeGradientCache = null;
+let deckCache = null;
+let touchMoveHandledThisFrame = false;
+
 function preload() {
   fontRegular = loadFont("ArchivoBlack-Regular.ttf");
   fontBold = loadFont("Bungee-Regular.ttf");
@@ -56,7 +61,8 @@ function preload() {
     {
       name: "Seal",
       bg: loadImage("seal.png"),
-      plastic: loadImage("Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png"),
+      plasticPath: "Gemini_Generated_Image_za4p9jza4p9jzגגa4p (1).png",
+      plastic: null,
       bgX: -100,
       bgY: -300,
       dark: 70,
@@ -87,7 +93,8 @@ function preload() {
     {
       name: "Whale",
       bg: loadImage("whale.png"),
-      plastic: loadImage("Gemini_Generated_Image_2rijc92rijc92rij.png"),
+      plasticPath: "Gemini_Generated_Image_2rijc92rijc92rij.png",
+      plastic: null,
       bgX: -330,
       bgY: -90,
       dark: 70,
@@ -118,7 +125,8 @@ function preload() {
     {
       name: "Sea Turtle",
       bg: loadImage("9B31B070-C374-4143-858F-F08E009188A7 (1).PNG"),
-      plastic: loadImage("bag.png"),
+      plasticPath: "bag.png",
+      plastic: null,
       bgX: -100,
       bgY: -300,
       dark: 70,
@@ -149,7 +157,8 @@ function preload() {
     {
       name: "Fish",
       bg: loadImage("nemo.png"),
-      plastic: loadImage("plate1.png"),
+      plasticPath: "plate1.png",
+      plastic: null,
       bgX: -140,
       bgY: -370,
       dark: 45,
@@ -180,7 +189,8 @@ function preload() {
     {
       name: "Dolphin",
       bg: loadImage("783D18C3-2A77-40C3-B7A0-8D0218BA5D65.PNG"),
-      plastic: loadImage("straw.png"),
+      plasticPath: "straw.png",
+      plastic: null,
       bgX: -330,
       bgY: -400,
       dark: 45,
@@ -212,28 +222,199 @@ function preload() {
   ];
 }
 
-function setup() {
-  let c = createCanvas(windowWidth, windowHeight);
-  c.elt.style.touchAction = 'none';
+/* =========================================================
+   PERFORMANCE HELPERS
+   ========================================================= */
+
+function applyPixelDensity() {
   pixelDensity(min(2, window.devicePixelRatio || 1));
-  frameRate(30);
+}
 
-  computeActiveTransform();
+function removeAtFast(arr, index) {
+  let last = arr.length - 1;
+  if (index !== last) arr[index] = arr[last];
+  arr.pop();
+}
 
-  setupGalleryCards();
+function setAppCursor() {
+  cursor(HAND);
+}
 
-  for (let i = 0; i < posters.length; i++) {
-    resetPoster(i);
+function initPosterState(index) {
+  let p = posters[index];
+  p.items = null;
+  p.collectedCount = 0;
+  p.timeLeft = 30;
+  p.lastSecondTime = millis();
+  p.showPopup = false;
+  p.showEndPopup = false;
+  p.confettiFired = false;
+  p.plasticLoaded = false;
+  p.plastic = null;
+  p._plasticLoading = false;
+  p._staticLayer = null;
+  p._cachedCountValue = -1;
+  p._cachedCountWidth = 0;
+}
+
+function ensurePosterReady(index) {
+  let p = posters[index];
+  if (p.plasticLoaded && p.items) return;
+
+  if (!p.plasticLoaded && !p._plasticLoading) {
+    p._plasticLoading = true;
+    loadImage(
+      p.plasticPath,
+      (img) => {
+        p.plastic = img;
+        p.plasticLoaded = true;
+        p._plasticLoading = false;
+        if (!p.items) resetPoster(index);
+      },
+      () => {
+        p._plasticLoading = false;
+      }
+    );
+  } else if (p.plasticLoaded && !p.items) {
+    resetPoster(index);
   }
 }
 
+function setActivePoster(index) {
+  activePoster = index;
+  ensurePosterReady(index);
+}
+
+function goToHome() {
+  appState = 'home';
+  setAppCursor();
+}
+
+function setup() {
+  let c = createCanvas(windowWidth, windowHeight);
+  c.elt.style.touchAction = 'none';
+  applyPixelDensity();
+  frameRate(30);
+
+  computeActiveTransform();
+  setupGalleryCards();
+
+  for (let i = 0; i < posters.length; i++) {
+    initPosterState(i);
+    rebuildPosterStaticLayer(i);
+  }
+
+  rebuildHomeCaches();
+  setAppCursor();
+}
+
 function windowResized() {
+  applyPixelDensity();
   resizeCanvas(windowWidth, windowHeight);
   computeActiveTransform();
+  rebuildHomeCaches();
+  for (let i = 0; i < posters.length; i++) {
+    rebuildPosterStaticLayer(i);
+  }
+}
+
+function rebuildHomeCaches() {
+  rebuildHomeGradient();
+  rebuildDeckCache();
+}
+
+function rebuildHomeGradient() {
+  if (homeGradientCache) homeGradientCache.remove();
+  homeGradientCache = createGraphics(width, height);
+  homeGradientCache.pixelDensity(pixelDensity());
+
+  let g = homeGradientCache;
+  g.noStroke();
+  for (let i = 0; i < height; i += 4) {
+    let t = i / height;
+    let c = lerpColor(color(6, 22, 34), color(10, 40, 56), t);
+    g.fill(c);
+    g.rect(0, i, width, 4);
+  }
+}
+
+function rebuildDeckCache() {
+  if (deckCache) deckCache.remove();
+  deckCache = createGraphics(width, height);
+  deckCache.pixelDensity(pixelDensity());
+
+  let g = deckCache;
+  let { cardW, cardH, cx, cy } = getDeckGeometry();
+
+  for (let i = posters.length - 1; i >= 0; i--) {
+    let p = posters[i];
+    let depth = i;
+    let offX = depth * 6;
+    let offY = depth * 8;
+    let rotAmt = (depth - 2) * 0.025;
+
+    g.push();
+    g.translate(cx + offX - (posters.length - 1) * 3, cy + offY - (posters.length - 1) * 4);
+    g.rotate(rotAmt);
+
+    g.drawingContext.save();
+    g.drawingContext.beginPath();
+    g.drawingContext.roundRect ?
+      g.drawingContext.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 18) :
+      g.drawingContext.rect(-cardW / 2, -cardH / 2, cardW, cardH);
+    g.drawingContext.clip();
+
+    g.drawingContext.filter = 'blur(7px) brightness(0.55) saturate(1.1)';
+    let s = cardW / posterW;
+    g.push();
+    g.translate(-cardW / 2, -cardH / 2);
+    g.scale(s);
+    drawPosterBaseTo(g, p);
+    g.pop();
+    g.drawingContext.filter = 'none';
+
+    g.fill(8, 20, 30, depth === 0 ? 70 : 130);
+    g.noStroke();
+    g.rect(-cardW / 2, -cardH / 2, cardW, cardH);
+
+    g.drawingContext.restore();
+
+    g.noFill();
+    g.stroke(255, depth === 0 ? 200 : 90);
+    g.strokeWeight(depth === 0 ? 2 : 1);
+    g.rect(-cardW / 2, -cardH / 2, cardW, cardH, 18);
+
+    if (depth === 0) {
+      g.fill(255);
+      g.noStroke();
+      g.textAlign(CENTER, CENTER);
+      g.textFont(fontBold);
+      g.textSize(16);
+      g.text("5 POSTERS", 0, cardH / 2 - 28);
+      g.textFont(fontRegular);
+      g.textSize(11);
+      g.fill(255, 200);
+      g.text("Tap to begin", 0, cardH / 2 - 10);
+    }
+
+    g.pop();
+  }
+}
+
+function rebuildPosterStaticLayer(index) {
+  let p = posters[index];
+  if (!p._staticLayer) {
+    p._staticLayer = createGraphics(posterW, posterH);
+    p._staticLayer.pixelDensity(1);
+  }
+
+  let g = p._staticLayer;
+  g.clear();
+  drawPosterBaseTo(g, p);
+  drawPosterTextTo(g, p);
 }
 
 function computeActiveTransform() {
-  // Fit the poster (650x975) inside the current window, mobile-first.
   let s = min(width / posterW, height / posterH) * 0.98;
   activeScale = s;
   activeX = (width - posterW * s) / 2;
@@ -241,7 +422,6 @@ function computeActiveTransform() {
 }
 
 function setupGalleryCards() {
-  // Cards used purely for the "stacked deck" visual on the home screen.
   galleryCards = [];
   for (let i = 0; i < posters.length; i++) {
     galleryCards.push({ posterIndex: i });
@@ -249,13 +429,14 @@ function setupGalleryCards() {
 }
 
 /* =========================================================
-   FLOATING PLASTIC (unchanged core logic)
+   FLOATING PLASTIC
    ========================================================= */
 
 class FloatingPlastic {
   constructor(poster, sizeType) {
     this.poster = poster;
     this.angle = random(-0.9, 0.9);
+    this._lastBoxAngle = this.angle;
 
     if (poster.name === "Seal") {
       if (sizeType === "large") this.w = random(360, 520);
@@ -308,11 +489,15 @@ class FloatingPlastic {
     this.floatAmount = random(0.15, 0.65);
   }
 
+  refreshBoundingBox() {
+    this._boxW = abs(this.w * cos(this.angle)) + abs(this.h * sin(this.angle));
+    this._boxH = abs(this.w * sin(this.angle)) + abs(this.h * cos(this.angle));
+  }
+
   fitInsidePoster() {
-    let boxW = abs(this.w * cos(this.angle)) + abs(this.h * sin(this.angle));
-    let boxH = abs(this.w * sin(this.angle)) + abs(this.h * cos(this.angle));
-    this.x = random(boxW / 2 + 5, posterW - boxW / 2 - 5);
-    this.y = random(boxH / 2 + 5, posterH - boxH / 2 - 5);
+    this.refreshBoundingBox();
+    this.x = random(this._boxW / 2 + 5, posterW - this._boxW / 2 - 5);
+    this.y = random(this._boxH / 2 + 5, posterH - this._boxH / 2 - 5);
   }
 
   update() {
@@ -324,35 +509,19 @@ class FloatingPlastic {
 
     this.angle += this.rotationSpeed;
 
-    let boxW = abs(this.w * cos(this.angle)) + abs(this.h * sin(this.angle));
-    let boxH = abs(this.w * sin(this.angle)) + abs(this.h * cos(this.angle));
+    if (abs(this.angle - this._lastBoxAngle) > 0.02) {
+      this._lastBoxAngle = this.angle;
+      this.refreshBoundingBox();
+    }
 
-    if (this.x < boxW / 2 || this.x > posterW - boxW / 2) {
+    if (this.x < this._boxW / 2 || this.x > posterW - this._boxW / 2) {
       this.vx *= -1;
-      this.x = constrain(this.x, boxW / 2, posterW - boxW / 2);
+      this.x = constrain(this.x, this._boxW / 2, posterW - this._boxW / 2);
     }
-    if (this.y < boxH / 2 || this.y > posterH - boxH / 2) {
+    if (this.y < this._boxH / 2 || this.y > posterH - this._boxH / 2) {
       this.vy *= -1;
-      this.y = constrain(this.y, boxH / 2, posterH - boxH / 2);
+      this.y = constrain(this.y, this._boxH / 2, posterH - this._boxH / 2);
     }
-  }
-
-  draw() {
-    push();
-    translate(this.x, this.y);
-    rotate(this.angle);
-
-    blendMode(SCREEN);
-    tint(255, this.opacity);
-    image(this.poster.plastic, -this.w / 2, -this.h / 2, this.w, this.h);
-
-    blendMode(LIGHTEST);
-    tint(255, 255, 255, this.whiteLayerOpacity);
-    image(this.poster.plastic, -this.w / 2, -this.h / 2, this.w, this.h);
-
-    blendMode(BLEND);
-    noTint();
-    pop();
   }
 
   isClicked(mx, my) {
@@ -364,6 +533,35 @@ class FloatingPlastic {
     let ly = dx * sa + dy * ca;
     return abs(lx) < this.w * 0.62 && abs(ly) < this.h * 1.0;
   }
+}
+
+function drawFloatingPlastics(items, poster) {
+  if (!items || !items.length || !poster.plastic) return;
+
+  blendMode(SCREEN);
+  for (let i = 0; i < items.length; i++) {
+    let item = items[i];
+    push();
+    translate(item.x, item.y);
+    rotate(item.angle);
+    tint(255, item.opacity);
+    image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
+    pop();
+  }
+
+  blendMode(LIGHTEST);
+  for (let i = 0; i < items.length; i++) {
+    let item = items[i];
+    push();
+    translate(item.x, item.y);
+    rotate(item.angle);
+    tint(255, 255, 255, item.whiteLayerOpacity);
+    image(poster.plastic, -item.w / 2, -item.h / 2, item.w, item.h);
+    pop();
+  }
+
+  blendMode(BLEND);
+  noTint();
 }
 
 /* =========================================================
@@ -385,14 +583,10 @@ class CollectParticle {
     this.life -= 6;
   }
   draw() {
-    push();
     noStroke();
     fill(255, 255, 255, this.life);
-    textFont(fontBold);
     textSize(20 * this.scale);
-    textAlign(CENTER, CENTER);
     text("+1", this.x, this.y);
-    pop();
   }
   isDead() {
     return this.life <= 0;
@@ -422,11 +616,9 @@ class SparklePiece {
     this.life -= 8;
   }
   draw() {
-    push();
     noStroke();
     fill(this.col[0], this.col[1], this.col[2], this.life);
     ellipse(this.x, this.y, this.size);
-    pop();
   }
   isDead() {
     return this.life <= 0;
@@ -436,6 +628,20 @@ class SparklePiece {
 function spawnCollectFeedback(x, y) {
   particles.push(new CollectParticle(x, y));
   for (let i = 0; i < 8; i++) particles.push(new SparklePiece(x, y));
+}
+
+function updateAndDrawParticles() {
+  if (!particles.length) return;
+
+  push();
+  textFont(fontBold);
+  textAlign(CENTER, CENTER);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+    if (particles[i].isDead()) removeAtFast(particles, i);
+  }
+  pop();
 }
 
 class ConfettiPiece {
@@ -461,15 +667,28 @@ class ConfettiPiece {
     this.rot += this.rotSpeed;
   }
   draw() {
-    push();
-    translate(this.x, this.y);
-    rotate(this.rot);
     noStroke();
     fill(this.col[0], this.col[1], this.col[2]);
-    rectMode(CENTER);
     rect(0, 0, this.size, this.size * 0.5);
-    pop();
   }
+}
+
+function updateAndDrawConfetti() {
+  if (!confetti.length) return;
+
+  push();
+  rectMode(CENTER);
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    confetti[i].update();
+    push();
+    translate(confetti[i].x, confetti[i].y);
+    rotate(confetti[i].rot);
+    confetti[i].draw();
+    pop();
+    if (confetti[i].y > posterH + 40) removeAtFast(confetti, i);
+  }
+  rectMode(CORNER);
+  pop();
 }
 
 function spawnConfettiBurst() {
@@ -483,6 +702,7 @@ function spawnConfettiBurst() {
 
 function resetPoster(index) {
   let p = posters[index];
+  if (!p.plastic) return;
 
   p.items = [];
   p.collectedCount = 0;
@@ -491,6 +711,7 @@ function resetPoster(index) {
   p.showPopup = false;
   p.showEndPopup = false;
   p.confettiFired = false;
+  p._cachedCountValue = -1;
 
   if (p.name === "Seal" || p.name === "Whale") {
     for (let i = 0; i < 36; i++) p.items.push(new FloatingPlastic(p, "large"));
@@ -516,6 +737,7 @@ function resetPoster(index) {
    ========================================================= */
 
 function draw() {
+  touchMoveHandledThisFrame = false;
   background(8, 18, 26);
 
   if (appState === 'home') {
@@ -536,18 +758,11 @@ function draw() {
    ========================================================= */
 
 function drawHomeScreen() {
-  push();
-
-  // soft background gradient
-  noStroke();
-  for (let i = 0; i < height; i += 4) {
-    let t = i / height;
-    let c = lerpColor(color(6, 22, 34), color(10, 40, 56), t);
-    fill(c);
-    rect(0, i, width, 4);
+  if (homeGradientCache) {
+    image(homeGradientCache, 0, 0);
   }
 
-  // headline
+  push();
   textAlign(CENTER, TOP);
   textFont(fontBold);
   let headSize = constrain(width * 0.09, 24, 40);
@@ -559,23 +774,20 @@ function drawHomeScreen() {
   textSize(constrain(width * 0.035, 12, 16));
   fill(255, 200);
   text("Tap the deck to start collecting plastic\nand turn it into real ocean donations", width / 2, height * 0.07 + headSize * 3.4);
-
   pop();
 
-  drawDeck();
+  if (deckCache) {
+    image(deckCache, 0, 0);
+  }
 
-  // hint
   push();
   textAlign(CENTER, CENTER);
-  fill(255, 180);
   textFont(fontRegular);
   textSize(13);
   let pulse = 150 + 80 * sin(frameCount * 0.06);
   fill(255, pulse);
   text("▲ Tap to open ▲", width / 2, height * 0.93);
   pop();
-
-  cursor(HAND);
 }
 
 function getDeckGeometry() {
@@ -584,69 +796,6 @@ function getDeckGeometry() {
   let cx = width / 2;
   let cy = height * 0.55;
   return { cardW, cardH, cx, cy };
-}
-
-function drawDeck() {
-  let { cardW, cardH, cx, cy } = getDeckGeometry();
-
-  // draw back-to-front so card 0 ends on top
-  for (let i = posters.length - 1; i >= 0; i--) {
-    let p = posters[i];
-    let depth = i; // 0 = top/front
-    let offX = depth * 6;
-    let offY = depth * 8;
-    let rotAmt = (depth - 2) * 0.025;
-
-    push();
-    translate(cx + offX - (posters.length - 1) * 3, cy + offY - (posters.length - 1) * 4);
-    rotate(rotAmt);
-
-    drawingContext.save();
-    drawingContext.beginPath();
-    drawingContext.roundRect ?
-      drawingContext.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 18) :
-      drawingContext.rect(-cardW / 2, -cardH / 2, cardW, cardH);
-    drawingContext.clip();
-
-    // blurred poster thumbnail
-    drawingContext.filter = 'blur(7px) brightness(0.55) saturate(1.1)';
-    let s = cardW / posterW;
-    push();
-    translate(-cardW / 2, -cardH / 2);
-    scale(s);
-    drawPosterBase(p);
-    pop();
-    drawingContext.filter = 'none';
-
-    // dark glass tint
-    fill(8, 20, 30, depth === 0 ? 70 : 130);
-    noStroke();
-    rect(-cardW / 2, -cardH / 2, cardW, cardH);
-
-    drawingContext.restore();
-
-    // border / glass edge
-    noFill();
-    stroke(255, depth === 0 ? 200 : 90);
-    strokeWeight(depth === 0 ? 2 : 1);
-    rect(-cardW / 2, -cardH / 2, cardW, cardH, 18);
-
-    if (depth === 0) {
-      // front card label
-      fill(255);
-      noStroke();
-      textAlign(CENTER, CENTER);
-      textFont(fontBold);
-      textSize(16);
-      text("5 POSTERS", 0, cardH / 2 - 28);
-      textFont(fontRegular);
-      textSize(11);
-      fill(255, 200);
-      text("Tap to begin", 0, cardH / 2 - 10);
-    }
-
-    pop();
-  }
 }
 
 function isTapOnDeck(mx, my) {
@@ -660,31 +809,40 @@ function isTapOnDeck(mx, my) {
    ========================================================= */
 
 function drawActivePoster() {
-  // smooth slide animation toward target
-  slideOffset = lerp(slideOffset, slideTarget, isDragging ? 1 : 0.18);
+  ensurePosterReady(activePoster);
+
+  if (isDragging) {
+    slideOffset = lerp(slideOffset, slideTarget, 1);
+  } else if (abs(slideOffset - slideTarget) < 0.5) {
+    slideOffset = slideTarget;
+  } else {
+    slideOffset = lerp(slideOffset, slideTarget, 0.18);
+  }
 
   fill(0, 0, 0, 230);
   noStroke();
   rect(0, 0, width, height);
 
-  // draw neighboring posters slightly visible during swipe for context
   drawSinglePoster(activePoster, slideOffset);
 
   let neighborGap = posterW * activeScale * 1.06;
   if (slideOffset > 2 && activePoster > 0) {
+    ensurePosterReady(activePoster - 1);
     drawSinglePoster(activePoster - 1, slideOffset - neighborGap / activeScale);
   }
   if (slideOffset < -2 && activePoster < posters.length - 1) {
+    ensurePosterReady(activePoster + 1);
     drawSinglePoster(activePoster + 1, slideOffset + neighborGap / activeScale);
   }
 
   drawDotsIndicator();
-  cursor(HAND);
 }
 
 function drawSinglePoster(index, offsetXInPosterSpace) {
   if (index < 0 || index >= posters.length) return;
   let p = posters[index];
+  let isActive = index === activePoster;
+  let shouldUpdateItems = isActive && !p.showPopup && !p.showEndPopup && p.items;
 
   push();
   translate(activeX + offsetXInPosterSpace * activeScale, activeY);
@@ -695,28 +853,31 @@ function drawSinglePoster(index, offsetXInPosterSpace) {
   drawingContext.rect(0, 0, posterW, posterH);
   drawingContext.clip();
 
-  drawPosterBase(p);
+  if (p._staticLayer) {
+    image(p._staticLayer, 0, 0);
+  } else {
+    drawPosterBase(p);
+    drawPosterText(p);
+  }
 
-  if (!p.showPopup && !p.showEndPopup && index === activePoster) {
+  if (isActive && !p.showPopup && !p.showEndPopup) {
     updateTimer(p);
   }
 
-  for (let i = 0; i < p.items.length; i++) {
-    if (!p.showEndPopup) p.items[i].update();
-    p.items[i].draw();
+  if (p.items) {
+    if (shouldUpdateItems) {
+      for (let i = 0; i < p.items.length; i++) {
+        p.items[i].update();
+      }
+    }
+    drawFloatingPlastics(p.items, p);
   }
 
-  drawPosterText(p);
   drawUnifiedCounterAndTimer(p);
   drawLearnMoreButton();
 
-  // collect particles (only render on the active poster slot)
-  if (index === activePoster) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      particles[i].update();
-      particles[i].draw();
-      if (particles[i].isDead()) particles.splice(i, 1);
-    }
+  if (isActive) {
+    updateAndDrawParticles();
   }
 
   if (p.showPopup) drawPopup(p);
@@ -727,11 +888,7 @@ function drawSinglePoster(index, offsetXInPosterSpace) {
       p.confettiFired = true;
     }
     if (p.collectedCount > 0) {
-      for (let i = confetti.length - 1; i >= 0; i--) {
-        confetti[i].update();
-        confetti[i].draw();
-        if (confetti[i].y > posterH + 40) confetti.splice(i, 1);
-      }
+      updateAndDrawConfetti();
     }
     drawEndPopup(p);
   }
@@ -756,10 +913,10 @@ function drawDotsIndicator() {
   let y = activeY + posterH * activeScale + 26;
   if (y > height - 16) y = height - 16;
 
+  push();
+  noStroke();
   for (let i = 0; i < n; i++) {
     let x = startX + i * spacing;
-    push();
-    noStroke();
     if (i === activePoster) {
       fill(255);
       ellipse(x, y, 11, 11);
@@ -767,13 +924,28 @@ function drawDotsIndicator() {
       fill(255, 110);
       ellipse(x, y, 7, 7);
     }
-    pop();
   }
+  pop();
 }
 
 /* =========================================================
    POSTER BASE / TEXT (layout updated: text left, HUD right)
    ========================================================= */
+
+function drawPosterBaseTo(ctx, p) {
+  ctx.push();
+  ctx.fill(50);
+  ctx.noStroke();
+  ctx.rect(0, 0, posterW, posterH);
+
+  ctx.imageMode(CORNER);
+  ctx.image(p.bg, p.bgX, p.bgY);
+
+  ctx.fill(0, 0, 0, p.dark);
+  ctx.noStroke();
+  ctx.rect(0, 0, posterW, posterH);
+  ctx.pop();
+}
 
 function drawPosterBase(p) {
   push();
@@ -790,46 +962,54 @@ function drawPosterBase(p) {
   pop();
 }
 
+function drawPosterTextTo(ctx, p) {
+  ctx.push();
+  ctx.textFont(fontBold);
+  ctx.textSize(p.title1Size);
+  ctx.fill(255);
+  ctx.text(p.title1, 11, p.title1Y + p.title1Offset);
+
+  ctx.textSize(p.title2Size);
+  ctx.text(p.title2, 11, p.title2Y + p.title2Offset);
+
+  ctx.textFont(fontRegular);
+  ctx.textSize(24);
+  ctx.text("USE LESS.", 20, 760);
+  ctx.text("THROW BETTER.", 20, 787);
+  ctx.text("ACT NOW.", 20, 814);
+
+  ctx.textSize(18);
+  for (let i = 0; i < p.sideText.length; i++) {
+    ctx.text(p.sideText[i], 24, 50 + i * 22);
+  }
+
+  ctx.textSize(20);
+  ctx.text("THINK BEFORE YOU THROW", 20, 712);
+  ctx.pop();
+}
+
 function drawPosterText(p) {
   push();
-  translate(11, p.title1Y);
   textFont(fontBold);
   textSize(p.title1Size);
   fill(255);
-  text(p.title1, 0, p.title1Offset);
-  pop();
+  text(p.title1, 11, p.title1Y + p.title1Offset);
 
-  push();
-  translate(11, p.title2Y);
-  textFont(fontBold);
   textSize(p.title2Size);
-  fill(255);
-  text(p.title2, 0, p.title2Offset);
-  pop();
+  text(p.title2, 11, p.title2Y + p.title2Offset);
 
-  push();
   textFont(fontRegular);
   textSize(24);
-  fill(255);
   text("USE LESS.", 20, 760);
   text("THROW BETTER.", 20, 787);
   text("ACT NOW.", 20, 814);
-  pop();
 
-  // sideText now LEFT, in the upper-left quiet area
-  push();
-  textFont(fontRegular);
   textSize(18);
-  fill(255);
   for (let i = 0; i < p.sideText.length; i++) {
     text(p.sideText[i], 24, 50 + i * 22);
   }
-  pop();
 
-  push();
-  textFont(fontRegular);
   textSize(20);
-  fill(255);
   text("THINK BEFORE YOU THROW", 20, 712);
   pop();
 }
@@ -846,7 +1026,6 @@ function drawUnifiedCounterAndTimer(p) {
   let hudX = posterW - hudW - 18;
   let hudY = 18;
 
-  // glass card
   fill(10, 60, 90, 215);
   stroke(255, 255, 255, 170);
   strokeWeight(1.5);
@@ -856,33 +1035,34 @@ function drawUnifiedCounterAndTimer(p) {
   noStroke();
   rect(hudX, hudY, hudW, hudH / 2, 16, 16, 0, 0);
 
-  // label
   textFont(fontRegular);
   textAlign(LEFT, TOP);
   fill(255, 200);
   textSize(11);
   text("PLASTIC COLLECTED", hudX + 14, hudY + 8);
 
-  // big count with a little icon dot
   fill(255);
   textFont(fontBold);
   textAlign(LEFT, CENTER);
   textSize(30);
   text(p.collectedCount, hudX + 14, hudY + 38);
 
-  // small unit chip
-  let numW = textWidth(String(p.collectedCount));
+  if (p.collectedCount !== p._cachedCountValue) {
+    textFont(fontBold);
+    textSize(30);
+    p._cachedCountWidth = textWidth(String(p.collectedCount));
+    p._cachedCountValue = p.collectedCount;
+  }
+
   textFont(fontRegular);
   textSize(13);
   fill(190, 230, 255);
-  text("pcs", hudX + 22 + numW, hudY + 40);
+  text("pcs", hudX + 22 + p._cachedCountWidth, hudY + 40);
 
-  // divider
   stroke(255, 90);
   strokeWeight(1);
   line(hudX + 14, hudY + 54, hudX + hudW - 14, hudY + 54);
 
-  // timer row
   noStroke();
   fill(255, 210);
   textFont(fontRegular);
@@ -912,7 +1092,7 @@ function updateTimer(p) {
 function drawLearnMoreButton() {
   push();
 
-  let hovering = false; // hover concept not critical on touch devices
+  let hovering = false;
 
   fill(255, 255, 255, hovering ? 235 : 210);
   stroke(255);
@@ -1065,7 +1245,6 @@ function drawEndPopup(p) {
     );
   }
 
-  // Try again button
   let btnAW = 220, btnAH = 50;
   let btnAX = popX + popW / 2 - btnAW / 2;
   let btnAY = popY + popH - 170;
@@ -1081,7 +1260,6 @@ function drawEndPopup(p) {
 
   p._tryAgainBox = { x: btnAX, y: btnAY, w: btnAW, h: btnAH };
 
-  // Share with friends button
   let btnSW = 220, btnSH = 50;
   let btnSX = popX + popW / 2 - btnSW / 2;
   let btnSY = btnAY + btnAH + 16;
@@ -1101,7 +1279,6 @@ function drawEndPopup(p) {
 }
 
 function isMouseOverEndCloseBox(mx, my) {
-  // matches the X drawn in drawEndPopup (popX+popW-35, popY+35) for popX=45,popY=230,popW=560
   return mx >= 560 && mx <= 605 && my >= 280 && my <= 325;
 }
 
@@ -1167,13 +1344,14 @@ function drawShareToast() {
    ========================================================= */
 
 function collectPlasticAt(p, mx, my) {
-  if (p.showEndPopup) return;
+  if (p.showEndPopup || !p.items) return;
 
   for (let i = p.items.length - 1; i >= 0; i--) {
     if (p.items[i].isClicked(mx, my)) {
       let item = p.items[i];
       p.items.splice(i, 1);
       p.collectedCount++;
+      p._cachedCountValue = -1;
       spawnCollectFeedback(item.x, item.y);
       return;
     }
@@ -1195,14 +1373,12 @@ function drawPresentationFrame() {
   strokeWeight(3);
   rect(20, 20, width - 40, height - 40, 36);
 
-  // notch
   noStroke();
   fill(0);
   rectMode(CENTER);
   rect(width / 2, 30, 90, 18, 10);
   rectMode(CORNER);
 
-  // simulated finger / tap pulse to suggest interaction (purely decorative)
   fakeFingerT += 0.02;
   let fx = width / 2 + sin(fakeFingerT) * width * 0.18;
   let fy = height * 0.7 + cos(fakeFingerT * 1.3) * height * 0.06;
@@ -1224,20 +1400,20 @@ function mousePressed() {
 
   if (appState === 'home') {
     if (isTapOnDeck(mouseX, mouseY)) {
-      activePoster = 0;
       appState = 'poster';
       slideOffset = 0;
       slideTarget = 0;
+      setActivePoster(0);
+      setAppCursor();
     }
     return;
   }
 
-  // poster view — remember the start point, but do NOT move anything yet
   dragStartX = mouseX;
   dragStartY = mouseY;
   dragStartOffset = slideOffset;
-  isDragging = false;      // becomes true only once real swipe intent is detected
-  swipeLocked = false;     // once we decide it's a tap, never let it become a swipe
+  isDragging = false;
+  swipeLocked = false;
 }
 
 function mouseDragged() {
@@ -1247,17 +1423,14 @@ function mouseDragged() {
   let dx = mouseX - dragStartX;
   let dy = mouseY - dragStartY;
 
-  // Only start treating this as a swipe once movement is clearly horizontal
-  // and big enough — small finger jitter while tapping must NOT move the poster.
   if (!isDragging) {
     if (abs(dx) > 14 && abs(dx) > abs(dy) * 1.4) {
       isDragging = true;
     } else if (abs(dy) > 14) {
-      // vertical movement -> this is not a swipe, lock it as a tap gesture
       swipeLocked = true;
       return;
     } else {
-      return; // not enough movement yet to decide
+      return;
     }
   }
 
@@ -1273,18 +1446,17 @@ function mouseReleased() {
 
     let threshold = 60;
     if (dragDeltaForTap > threshold && activePoster > 0) {
-      activePoster--;
+      setActivePoster(activePoster - 1);
       slideOffset = -(posterW * 1.06);
       slideTarget = 0;
     } else if (dragDeltaForTap < -threshold && activePoster < posters.length - 1) {
-      activePoster++;
+      setActivePoster(activePoster + 1);
       slideOffset = (posterW * 1.06);
       slideTarget = 0;
     } else {
       slideTarget = 0;
     }
   } else {
-    // never became a swipe -> treat as a tap, regardless of tiny jitter
     handlePosterTap(mouseX, mouseY);
   }
 
@@ -1301,7 +1473,7 @@ function handlePosterTap(screenX, screenY) {
   if (mx < 0 || mx > posterW || my < 0 || my > posterH) return;
 
   if (isMouseOverPosterCloseX(mx, my)) {
-    appState = 'home';
+    goToHome();
     return;
   }
 
@@ -1346,6 +1518,8 @@ function touchStarted() {
 }
 
 function touchMoved() {
+  if (touchMoveHandledThisFrame) return false;
+  touchMoveHandledThisFrame = true;
   mouseDragged();
   return false;
 }
@@ -1360,12 +1534,12 @@ function keyPressed() {
     presentationMode = !presentationMode;
   }
   if (key === 'ArrowLeft' && appState === 'poster' && activePoster > 0) {
-    activePoster--;
+    setActivePoster(activePoster - 1);
   }
   if (key === 'ArrowRight' && appState === 'poster' && activePoster < posters.length - 1) {
-    activePoster++;
+    setActivePoster(activePoster + 1);
   }
   if (key === 'Escape') {
-    appState = 'home';
+    goToHome();
   }
 }
